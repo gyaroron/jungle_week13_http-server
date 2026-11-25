@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+    <style>
+      .t{font-size:14px;font-weight:700;fill:#0b0b0b}
+      .s{font-size:12px;fill:#52514e}
+      .c{font-size:11.5px;fill:#0b0b0b;font-family:Menlo,Consolas,monospace}
+      .box{fill:#ffffff;stroke:#c9c8c2;stroke-width:1.4}
+      .px{fill:#fdf0ea;stroke:#eb6834;stroke-width:1.6}
+      .ln{stroke:#52514e;stroke-width:1.6;fill:none}
+    </style>
+  </defs>
+  <rect width="960" height="440" rx="14" fill="#fcfcfb"/>
+  <text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">Forward Proxy vs Reverse Proxy — 둘 다 구현</text>
+
+  <!-- left panel: forward -->
+  <rect x="32" y="66" width="430" height="350" rx="12" fill="#ffffff" stroke="#e4e3de"/>
+  <text x="52" y="96" class="t">Forward Proxy (-f) · 클라이언트를 대신함</text>
+  <rect x="52" y="120" width="110" height="52" rx="8" class="box"/><text x="107" y="151" text-anchor="middle" class="t">Client</text>
+  <rect x="188" y="120" width="110" height="52" rx="8" class="px"/><text x="243" y="151" text-anchor="middle" class="t">Proxy</text>
+  <rect x="324" y="120" width="118" height="52" rx="8" class="box"/><text x="383" y="144" text-anchor="middle" class="t">원 서버</text><text x="383" y="161" text-anchor="middle" class="s">아무 host:port</text>
+  <line x1="162" y1="146" x2="184" y2="146" class="ln" marker-end="url(#a)"/>
+  <line x1="298" y1="146" x2="320" y2="146" class="ln" marker-end="url(#a)"/>
+  <rect x="52" y="194" width="390" height="56" rx="8" fill="#f3f2ef"/>
+  <text x="64" y="216" class="c">GET http://127.0.0.1:8001/x HTTP/1.1</text>
+  <text x="64" y="238" class="c">  → GET /x HTTP/1.1 + Host: 127.0.0.1:8001</text>
+  <text x="52" y="276" class="s">• URL에서 host/port 추출 → getaddrinfo → 새 TCP 연결</text>
+  <text x="52" y="296" class="s">• Connection·Proxy-* 등 hop-by-hop 헤더 제거</text>
+  <text x="52" y="316" class="s">• 헤더 CR/LF 주입 차단 · X-Forwarded-For 추가</text>
+  <text x="52" y="336" class="s">• https:// 는 400, CONNECT 는 501 로 명시적 거절</text>
+  <text x="52" y="356" class="s">• 성공한 GET 200 응답은 캐시 (TTL 5s, X-Cache)</text>
+  <text x="52" y="392" class="s">용도: 사내망 출구 통제 · 캐싱 · 클라이언트 익명화</text>
+
+  <!-- right panel: reverse -->
+  <rect x="498" y="66" width="430" height="350" rx="12" fill="#ffffff" stroke="#e4e3de"/>
+  <text x="518" y="96" class="t">Reverse Proxy (-c routes.conf) · 서버를 대신함</text>
+  <rect x="518" y="168" width="92" height="52" rx="8" class="box"/><text x="564" y="199" text-anchor="middle" class="t">Client</text>
+  <rect x="636" y="160" width="110" height="68" rx="8" class="px"/><text x="691" y="188" text-anchor="middle" class="t">Proxy</text><text x="691" y="208" text-anchor="middle" class="s">route_match</text>
+  <line x1="610" y1="194" x2="632" y2="194" class="ln" marker-end="url(#a)"/>
+  <rect x="790" y="118" width="118" height="44" rx="8" class="box"/><text x="849" y="139" text-anchor="middle" class="t">:8001</text><text x="849" y="155" text-anchor="middle" class="s">요청 1, 3, 5…</text>
+  <rect x="790" y="174" width="118" height="44" rx="8" class="box"/><text x="849" y="195" text-anchor="middle" class="t">:8002</text><text x="849" y="211" text-anchor="middle" class="s">요청 2, 4, 6…</text>
+  <rect x="790" y="230" width="118" height="44" rx="8" fill="#fbeaea" stroke="#c53a3a" stroke-dasharray="4 3"/><text x="849" y="251" text-anchor="middle" class="t">다운</text><text x="849" y="267" text-anchor="middle" class="s">→ 다음 백엔드</text>
+  <path d="M746 186 L786 140" class="ln" marker-end="url(#a)"/>
+  <path d="M746 196 L786 196" class="ln" marker-end="url(#a)"/>
+  <path d="M746 206 L786 250" class="ln" marker-end="url(#a)" stroke-dasharray="4 3"/>
+  <rect x="518" y="290" width="390" height="34" rx="8" fill="#f3f2ef"/>
+  <text x="530" y="312" class="c">* /api/ 127.0.0.1:8001 127.0.0.1:8002</text>
+  <text x="518" y="344" class="s">• Host + 가장 긴 경로 접두사 규칙 선택, 백엔드는 mutex 보호 RR</text>
+  <text x="518" y="364" class="s">• 전부 연결 실패 → 502 · 연결/첫 응답 지연 → 504</text>
+  <text x="518" y="392" class="s">용도: 로드밸런싱 · 내부 서버 은닉 · TLS 종단 · 캐싱</text>
+</svg>

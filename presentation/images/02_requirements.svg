@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 654" width="960" height="654" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="654" rx="14" fill="#fcfcfb"/>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">요구사항 검수표</text>
+<text x="32" y="68" font-size="13" fill="#52514e">2026-11-25 로컬 재실행 기준 (macOS · make test / functional_test.sh / asan · tsan / ab)</text>
+<rect x="776" y="30" width="152" height="28" rx="14" fill="#e6f4e6"/><text x="852" y="49" text-anchor="middle" font-size="13" font-weight="700" fill="#0a5c0a">✓ PASS 16 / 16</text>
+<rect x="32" y="96" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="122" r="12" fill="#008300"/><path d="M52 122 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="118" font-size="14" font-weight="700" fill="#0b0b0b">TCP 소켓 서버</text>
+<text x="82" y="137" font-size="12" fill="#52514e">socket→bind→listen→accept · SO_REUSEADDR</text>
+<text x="458" y="118" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="158" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="184" r="12" fill="#008300"/><path d="M52 184 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="180" font-size="14" font-weight="700" fill="#0b0b0b">HTTP 요청 파싱</text>
+<text x="82" y="199" font-size="12" fill="#52514e">요청줄·헤더 32개·Content-Length 본문 · GET/POST</text>
+<text x="458" y="180" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="220" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="246" r="12" fill="#008300"/><path d="M52 246 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="242" font-size="14" font-weight="700" fill="#0b0b0b">HTTP 응답 생성</text>
+<text x="82" y="261" font-size="12" fill="#52514e">상태줄 + Content-Type/Length/Connection/Date</text>
+<text x="458" y="242" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="282" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="308" r="12" fill="#008300"/><path d="M52 308 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="304" font-size="14" font-weight="700" fill="#0b0b0b">정적 파일 + MIME</text>
+<text x="82" y="323" font-size="12" fill="#52514e">html css js json png jpg gif svg ico · 403/404/500</text>
+<text x="458" y="304" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="344" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="370" r="12" fill="#008300"/><path d="M52 370 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="366" font-size="14" font-weight="700" fill="#0b0b0b">동적 요청 처리</text>
+<text x="82" y="385" font-size="12" fill="#52514e">CGI: fork + execve + pipe (GET/POST)</text>
+<text x="458" y="366" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="406" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="432" r="12" fill="#008300"/><path d="M52 432 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="428" font-size="14" font-weight="700" fill="#0b0b0b">동시 요청 처리</text>
+<text x="82" y="447" font-size="12" fill="#52514e">pthread 스레드 풀 (+순차/연결별 스레드 비교)</text>
+<text x="458" y="428" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="468" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="494" r="12" fill="#008300"/><path d="M52 494 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="490" font-size="14" font-weight="700" fill="#0b0b0b">Forward Proxy</text>
+<text x="82" y="509" font-size="12" fill="#52514e">-f · absolute-form → origin-form · 캐싱(선택)</text>
+<text x="458" y="490" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="32" y="530" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="58" cy="556" r="12" fill="#008300"/><path d="M52 556 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="82" y="552" font-size="14" font-weight="700" fill="#0b0b0b">Reverse Proxy</text>
+<text x="82" y="571" font-size="12" fill="#52514e">Host+경로 라우팅 · Round-Robin · 502/504</text>
+<text x="458" y="552" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="96" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="122" r="12" fill="#008300"/><path d="M508 122 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="118" font-size="14" font-weight="700" fill="#0b0b0b">CLI / 설정 파일</text>
+<text x="538" y="137" font-size="12" fill="#52514e">-p -r -b -w -t -c -f  ·  routes.conf</text>
+<text x="914" y="118" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="158" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="184" r="12" fill="#008300"/><path d="M508 184 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="180" font-size="14" font-weight="700" fill="#0b0b0b">Makefile</text>
+<text x="538" y="199" font-size="12" fill="#52514e">all · test · asan · tsan · test-asan</text>
+<text x="914" y="180" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="220" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="246" r="12" fill="#008300"/><path d="M508 246 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="242" font-size="14" font-weight="700" fill="#0b0b0b">시그널 / 종료</text>
+<text x="538" y="261" font-size="12" fill="#52514e">SIGINT·SIGTERM 정상 종료 · SIGPIPE 무시</text>
+<text x="914" y="242" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="282" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="308" r="12" fill="#008300"/><path d="M508 308 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="304" font-size="14" font-weight="700" fill="#0b0b0b">단위 테스트</text>
+<text x="538" y="323" font-size="12" fill="#52514e">HTTP 파서 · MIME · 라우팅 3개 스위트 통과</text>
+<text x="914" y="304" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="344" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="370" r="12" fill="#008300"/><path d="M508 370 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="366" font-size="14" font-weight="700" fill="#0b0b0b">기능 테스트</text>
+<text x="538" y="385" font-size="12" fill="#52514e">22/22 통과 · 캐시 keep-alive 회귀 찾아서 수정</text>
+<text x="914" y="366" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="406" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="432" r="12" fill="#008300"/><path d="M508 432 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="428" font-size="14" font-weight="700" fill="#0b0b0b">부하 테스트</text>
+<text x="538" y="447" font-size="12" fill="#52514e">ab 10,000건 · 동시 100 · keep-alive 23k rps</text>
+<text x="914" y="428" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="468" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="494" r="12" fill="#008300"/><path d="M508 494 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="490" font-size="14" font-weight="700" fill="#0b0b0b">메모리 · 스레드 검사</text>
+<text x="538" y="509" font-size="12" fill="#52514e">ASan+UBSan · TSan 오류 0 · leaks 0 (캐시 전 기록)</text>
+<text x="914" y="490" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<rect x="488" y="530" width="440" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.2"/>
+<circle cx="514" cy="556" r="12" fill="#008300"/><path d="M508 556 l4 4 l8 -9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="538" y="552" font-size="14" font-weight="700" fill="#0b0b0b">엣지 케이스</text>
+<text x="538" y="571" font-size="12" fill="#52514e">잘못된 요청·긴 URI·큰 본문·백엔드 다운/지연·중도 끊김</text>
+<text x="914" y="552" text-anchor="end" font-size="11" font-weight="700" fill="#0a5c0a">PASS</text>
+<text x="32" y="640" font-size="12" fill="#52514e">※ “둘 중 하나 이상” 조건(동시성 모델, Proxy 방식)은 하나만 충족해도 PASS — 이 프로젝트는 둘 다/셋 다 구현</text></svg>

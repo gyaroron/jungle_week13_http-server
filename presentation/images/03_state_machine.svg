@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c53a3a"/>
+    </marker>
+    <style>
+      .st{fill:#eaf2fc;stroke:#2a78d6;stroke-width:1.6}
+      .t{font-size:14px;font-weight:700;fill:#0b0b0b;font-family:Menlo,Consolas,monospace}
+      .s{font-size:12px;fill:#52514e}
+      .ln{stroke:#52514e;stroke-width:1.6;fill:none}
+      .er{stroke:#c53a3a;stroke-width:1.4;fill:none;stroke-dasharray:5 4}
+      .el{font-size:11px;fill:#a32e2e}
+    </style>
+  </defs>
+  <rect width="960" height="400" rx="14" fill="#fcfcfb"/>
+  <text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">연결 하나의 일생 — conn.c 상태 머신</text>
+  <text x="32" y="68" class="s">TCP 상태가 아니라 서버가 관리하는 처리 단계 · 한 연결에서 여러 요청(keep-alive)을 반복 처리</text>
+
+  <rect x="32"  y="120" width="136" height="56" rx="28" class="st"/><text x="100" y="153" text-anchor="middle" class="t">READING</text>
+  <rect x="212" y="120" width="136" height="56" rx="28" class="st"/><text x="280" y="153" text-anchor="middle" class="t">PARSING</text>
+  <rect x="392" y="120" width="136" height="56" rx="28" class="st"/><text x="460" y="153" text-anchor="middle" class="t">ROUTING</text>
+  <rect x="572" y="120" width="156" height="56" rx="28" class="st"/><text x="650" y="153" text-anchor="middle" class="t">RESPONDING</text>
+  <rect x="772" y="120" width="156" height="56" rx="28" class="st"/><text x="850" y="146" text-anchor="middle" class="t">KEEPALIVE</text><text x="850" y="163" text-anchor="middle" class="t">_CHECK</text>
+
+  <line x1="168" y1="148" x2="208" y2="148" class="ln" marker-end="url(#a)"/>
+  <line x1="348" y1="148" x2="388" y2="148" class="ln" marker-end="url(#a)"/>
+  <line x1="528" y1="148" x2="568" y2="148" class="ln" marker-end="url(#a)"/>
+  <line x1="728" y1="148" x2="768" y2="148" class="ln" marker-end="url(#a)"/>
+
+  <text x="100" y="200" text-anchor="middle" class="s">recv() 누적</text>
+  <text x="100" y="216" text-anchor="middle" class="s">\r\n\r\n 나올 때까지</text>
+  <text x="280" y="200" text-anchor="middle" class="s">http_parse()</text>
+  <text x="280" y="216" text-anchor="middle" class="s">본문 Content-Length 수신</text>
+  <text x="460" y="200" text-anchor="middle" class="s">캐시 → 프록시 → CGI</text>
+  <text x="460" y="216" text-anchor="middle" class="s">→ 정적 파일</text>
+  <text x="650" y="200" text-anchor="middle" class="s">응답 전송 완료</text>
+
+  <!-- keep-alive loop -->
+  <path d="M850 120 C850 84, 100 84, 100 116" class="ln" marker-end="url(#a)"/>
+  <rect x="330" y="76" width="300" height="22" rx="11" fill="#fcfcfb"/>
+  <text x="480" y="92" text-anchor="middle" class="s">keep-alive: 처리한 요청만 버퍼에서 memmove 후 다시 읽기</text>
+
+  <!-- closing -->
+  <rect x="612" y="282" width="140" height="52" rx="26" fill="#fbeaea" stroke="#c53a3a" stroke-width="1.6"/>
+  <text x="682" y="313" text-anchor="middle" class="t">CLOSING</text>
+  <rect x="792" y="282" width="136" height="52" rx="26" fill="#f3f2ef" stroke="#8a8984" stroke-width="1.6"/>
+  <text x="860" y="313" text-anchor="middle" class="t">CLOSED</text>
+  <line x1="752" y1="308" x2="788" y2="308" class="ln" marker-end="url(#a)"/>
+  <path d="M850 176 L850 240 L700 240 L700 278" class="ln" marker-end="url(#a)"/>
+  <text x="770" y="232" text-anchor="middle" class="s">Connection: close</text>
+
+  <path d="M100 228 L100 300 L608 300" class="er" marker-end="url(#r)"/>
+  <path d="M280 228 L280 300" class="er"/>
+  <path d="M460 228 L460 300" class="er"/>
+  <text x="112" y="262" class="el">peer 종료 · 타임아웃 408</text>
+  <text x="292" y="262" class="el">400 · 413 · 414 · 431 · 501 · 505</text>
+  <text x="472" y="262" class="el">전송 실패 (EPIPE)</text>
+
+  <text x="32" y="372" class="s">CLOSING에서 free(body) + close(fd) 를 한 곳에서 수행 → 어떤 경로로 끝나도 메모리 · fd가 회수됨 (기능 테스트: 요청 전후 fd 수 동일, 좀비 프로세스 0)</text>
+</svg>

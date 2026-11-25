@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 490" width="960" height="490" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="490" rx="14" fill="#fcfcfb"/>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">부하 테스트 (ApacheBench, 같은 Mac loopback, -O0 디버그 빌드)</text>
+<text x="32" y="68" font-size="13" fill="#52514e">초당 처리 요청 수 (requests/sec) · 높을수록 좋음 · ①은 docs/benchmarks 기록, ②는 회귀 수정 후 재측정</text>
+<text x="32" y="110" font-size="15" font-weight="700" fill="#0b0b0b">① 동시성 모델 3종 비교</text>
+<text x="32" y="130" font-size="12" fill="#52514e">ab -n 2000 -c 50 · 4회 중앙값 (막대) · 최소–최대 (선)</text>
+<line x1="182.0" y1="144" x2="182.0" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="182.0" y="296" text-anchor="middle" font-size="11" fill="#8a8984">0</text>
+<line x1="270.0" y1="144" x2="270.0" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="270.0" y="296" text-anchor="middle" font-size="11" fill="#8a8984">10k</text>
+<line x1="358.0" y1="144" x2="358.0" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="358.0" y="296" text-anchor="middle" font-size="11" fill="#8a8984">20k</text>
+<text x="172" y="162" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">순차 처리</text>
+<text x="172" y="177" text-anchor="end" font-size="11" fill="#52514e">main 스레드</text>
+<path d="M182 150 H280.795264 q4 0 4 4 V172 q0 4 -4 4 H182 Z" fill="#2a78d6"/>
+<line x1="280.7" y1="163.0" x2="287.4" y2="163.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="280.7" y1="158.0" x2="280.7" y2="168.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="287.4" y1="158.0" x2="287.4" y2="168.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="295.4" y="167" font-size="13" font-weight="700" fill="#0b0b0b">11,681</text>
+<text x="172" y="210" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">연결별 스레드</text>
+<text x="172" y="225" text-anchor="end" font-size="11" fill="#52514e">pthread_create</text>
+<path d="M182 198 H310.244904 q4 0 4 4 V220 q0 4 -4 4 H182 Z" fill="#2a78d6"/>
+<line x1="288.1" y1="211.0" x2="320.1" y2="211.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="288.1" y1="206.0" x2="288.1" y2="216.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="320.1" y1="206.0" x2="320.1" y2="216.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="328.1" y="215" font-size="13" font-weight="700" fill="#0b0b0b">15,028</text>
+<text x="172" y="258" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">스레드 풀</text>
+<text x="172" y="273" text-anchor="end" font-size="11" fill="#52514e">worker 8 + 큐</text>
+<path d="M182 246 H309.978704 q4 0 4 4 V268 q0 4 -4 4 H182 Z" fill="#2a78d6"/>
+<line x1="300.5" y1="259.0" x2="327.4" y2="259.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="300.5" y1="254.0" x2="300.5" y2="264.0" stroke="#0b0b0b" stroke-width="1.5"/><line x1="327.4" y1="254.0" x2="327.4" y2="264.0" stroke="#0b0b0b" stroke-width="1.5"/>
+<text x="335.4" y="263" font-size="13" font-weight="700" fill="#0b0b0b">14,998</text>
+<text x="500" y="110" font-size="15" font-weight="700" fill="#0b0b0b">② 스레드 풀 worker 수 × keep-alive</text>
+<text x="500" y="130" font-size="12" fill="#52514e">ab -n 10000 -c 100 · 현재 코드 1회</text>
+<line x1="650.0" y1="144" x2="650.0" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="650.0" y="296" text-anchor="middle" font-size="11" fill="#8a8984">0</text>
+<line x1="733.2" y1="144" x2="733.2" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="733.2" y="296" text-anchor="middle" font-size="11" fill="#8a8984">10k</text>
+<line x1="816.4" y1="144" x2="816.4" y2="280" stroke="#e4e3de" stroke-width="1"/>
+<text x="816.4" y="296" text-anchor="middle" font-size="11" fill="#8a8984">20k</text>
+<text x="640" y="162" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">w8 매번 새 연결</text>
+<text x="640" y="177" text-anchor="end" font-size="11" fill="#52514e"></text>
+<path d="M650 150 H760.8224064 q4 0 4 4 V172 q0 4 -4 4 H650 Z" fill="#2a78d6"/>
+<text x="772.8" y="167" font-size="13" font-weight="700" fill="#0b0b0b">13,801</text>
+<text x="772.8" y="182" font-size="11" fill="#a32e2e">실패 0</text>
+<text x="640" y="210" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">w8 keep-alive</text>
+<text x="640" y="225" text-anchor="end" font-size="11" fill="#52514e">worker 점유</text>
+<path d="M650 198 H649 q4 0 4 4 V220 q0 4 -4 4 H650 Z" fill="#2a78d6"/>
+<text x="661.0" y="215" font-size="13" font-weight="700" fill="#0b0b0b">328</text>
+<text x="661.0" y="230" font-size="11" fill="#a32e2e">실패 48</text>
+<text x="640" y="258" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">w128 keep-alive</text>
+<text x="640" y="273" text-anchor="end" font-size="11" fill="#52514e">캐시 HIT 포함</text>
+<path d="M650 246 H840.3920576 q4 0 4 4 V268 q0 4 -4 4 H650 Z" fill="#2a78d6"/>
+<text x="852.4" y="263" font-size="13" font-weight="700" fill="#0b0b0b">23,364</text>
+<text x="852.4" y="278" font-size="11" fill="#a32e2e">실패 0</text>
+<rect x="32" y="350" width="896" height="118" rx="10" fill="#ffffff" stroke="#e4e3de"/>
+<text x="48" y="376" font-size="14" font-weight="700" fill="#0b0b0b">해석</text>
+<text x="48" y="396" font-size="12.5" font-weight="400" fill="#3a3936">• 순차 → 스레드 도입만으로 약 1.3배. 연결별 스레드와 풀은 이 조건에선 비슷 (생성 비용 vs 큐 대기의 트레이드오프).</text>
+<text x="48" y="416" font-size="12.5" font-weight="400" fill="#3a3936">• 스레드 풀 + keep-alive 함정: 연결 1개가 worker 1개를 끝날 때까지 점유 → 동시 연결 100 > worker 8 이면 나머지가 굶음.</text>
+<text x="48" y="436" font-size="12.5" font-weight="400" fill="#3a3936">  이것이 C10K 문제의 축소판 — 근본 해결은 epoll/kqueue 이벤트 루프 (향후 과제).</text>
+<text x="48" y="456" font-size="12.5" font-weight="400" fill="#3a3936">• 캐시 keep-alive 회귀 수정 후 w128 keep-alive: 15,105 (캐시 이전 3회 평균) → 23,364 rps (1회). 연결 재사용 + HIT 효과.</text>
+</svg>
