@@ -2,13 +2,13 @@
 #include "config.h"
 #include "log.h"
 #include "net.h"
-#include "pool.h"
 #include "route.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,8 +18,13 @@
 
 static volatile sig_atomic_t g_stop = 0;
 static const struct config *g_worker_config = NULL;
+static pthread_mutex_t g_active_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_active_changed = PTHREAD_COND_INITIALIZER;
+static size_t g_active_threads = 0;
 
-#define APP_QUEUE_CAP 128
+struct connection_job {
+    int fd;
+};
 
 // 일꾼이 받은 연결 번호를 기존 연결 처리기에 전달합니다.
 static void serve_connection(int fd) {
@@ -34,6 +39,30 @@ static void serve_connection(int fd) {
         }
     }
     conn_handle(fd, client_ip, g_worker_config);
+}
+
+// 연결별 스레드는 heap에 받은 연결 번호를 꺼낸 뒤, 기존 연결 처리기를 실행합니다.
+static void *serve_connection_thread(void *argument) {
+    struct connection_job *job = argument;
+    int fd = job->fd;
+    free(job);
+
+    serve_connection(fd);
+
+    int result = pthread_mutex_lock(&g_active_mutex);
+    if (result != 0) {
+        server_log_errno("pthread_mutex_lock active", result);
+        _exit(1);
+    }
+    g_active_threads--;
+    result = pthread_cond_broadcast(&g_active_changed);
+    int unlock_result = pthread_mutex_unlock(&g_active_mutex);
+    if (result != 0 || unlock_result != 0) {
+        server_log_errno("pthread connection completion",
+                         result != 0 ? result : unlock_result);
+        _exit(1);
+    }
+    return NULL;
 }
 
 // 부분적으로 읽은 라우팅 규칙도 초기화된 mutex만 정리합니다.
@@ -110,17 +139,8 @@ int main(int argc, char **argv) {
     // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
     server_log("listening on %s:%d (fd %d)\n", cfg.host, cfg.port, listen_fd);
 
-    // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
+    // 연결별 스레드가 끝날 때까지 설정과 라우트를 읽기 전용으로 공유합니다.
     g_worker_config = &cfg;
-    struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
-                                      serve_connection);
-    if (workers == NULL) {
-        server_log_errno("pool_create", errno);
-        close(listen_fd);
-        cleanup_routes(routes, cfg.route_count);
-        return 1;
-    }
-
     // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
     while (!g_stop) {
         int ready = net_wait(listen_fd, POLLIN, 1000);
@@ -181,15 +201,74 @@ int main(int argc, char **argv) {
         server_log("accepted fd %d from %s:%d\n", conn_fd, ip,
                    ntohs(peer.sin_port));
 
-        // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
-        if (pool_submit(workers, conn_fd) < 0) {
-            server_log_errno("pool_submit", errno);
+        // 스레드가 연결 번호를 받기 전까지 보관할 heap 공간을 만듭니다.
+        struct connection_job *job = malloc(sizeof(*job));
+        if (job == NULL) {
+            server_log_errno("allocate connection job", errno);
             close(conn_fd);
+            continue;
+        }
+        job->fd = conn_fd;
+
+        pthread_t thread;
+        int thread_error = pthread_mutex_lock(&g_active_mutex);
+        if (thread_error != 0) {
+            server_log_errno("pthread_mutex_lock active", thread_error);
+            free(job);
+            close(conn_fd);
+            continue;
+        }
+        g_active_threads++;
+        thread_error = pthread_create(&thread, NULL,
+                                      serve_connection_thread, job);
+        if (thread_error != 0) {
+            g_active_threads--;
+            pthread_mutex_unlock(&g_active_mutex);
+            server_log_errno("pthread_create", thread_error);
+            free(job);
+            close(conn_fd);
+            continue;
+        }
+        int unlock_error = pthread_mutex_unlock(&g_active_mutex);
+        if (unlock_error != 0) {
+            server_log_errno("pthread_mutex_unlock active", unlock_error);
+            _exit(1);
+        }
+
+        // 분리한 스레드는 연결 하나를 끝낸 뒤 join 없이 종료합니다.
+        thread_error = pthread_detach(thread);
+        if (thread_error != 0) {
+            server_log_errno("pthread_detach", thread_error);
+            thread_error = pthread_join(thread, NULL);
+            if (thread_error != 0) {
+                server_log_errno("pthread_join fallback", thread_error);
+                _exit(1);
+            }
         }
     }
 
     close(listen_fd);
-    pool_shutdown(workers);
+    // detached 스레드가 설정과 라우트를 다 쓸 때까지 main이 정리하지 않습니다.
+    int wait_error = pthread_mutex_lock(&g_active_mutex);
+    if (wait_error != 0) {
+        server_log_errno("pthread_mutex_lock shutdown", wait_error);
+        _exit(1);
+    }
+    while (g_active_threads > 0) {
+        wait_error = pthread_cond_wait(&g_active_changed, &g_active_mutex);
+        if (wait_error != 0) {
+            pthread_mutex_unlock(&g_active_mutex);
+            server_log_errno("pthread_cond_wait shutdown", wait_error);
+            _exit(1);
+        }
+    }
+    wait_error = pthread_mutex_unlock(&g_active_mutex);
+    if (wait_error != 0) {
+        server_log_errno("pthread_mutex_unlock shutdown", wait_error);
+        _exit(1);
+    }
+    pthread_cond_destroy(&g_active_changed);
+    pthread_mutex_destroy(&g_active_mutex);
     server_log("server stopped\n");
     cleanup_routes(routes, cfg.route_count);
     return 0;
