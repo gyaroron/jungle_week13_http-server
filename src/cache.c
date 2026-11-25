@@ -12,14 +12,17 @@
 
 #define CACHE_ENTRY_LIMIT 64
 #define CACHE_TOTAL_LIMIT (8U * 1024U * 1024U)
-// 응답에 더 긴 유효 기간이 있어도 캐시는 최대 30초까지만 보관합니다.
-#define CACHE_TTL_SECONDS 30
+// 외부 원본 변경을 더 빨리 다시 읽도록 응답 기본 보관 시간을 제한합니다.
+#define CACHE_TTL_SECONDS 5
 
 struct cache_entry {
     char key[CACHE_KEY_MAX];
     unsigned char *response;
     size_t length;
     struct timespec expires_at;
+    int has_file_source;
+    char file_source[CACHE_SOURCE_MAX];
+    struct stat file_source_stat;
     struct cache_entry *next;
 };
 
@@ -36,6 +39,41 @@ static int time_reached(const struct timespec *now,
     return now->tv_sec > deadline->tv_sec ||
            (now->tv_sec == deadline->tv_sec &&
             now->tv_nsec >= deadline->tv_nsec);
+}
+
+static int same_file_version(const struct stat *left,
+                             const struct stat *right) {
+#ifdef __APPLE__
+    return left->st_dev == right->st_dev && left->st_ino == right->st_ino &&
+           left->st_size == right->st_size &&
+           left->st_mtimespec.tv_sec == right->st_mtimespec.tv_sec &&
+           left->st_mtimespec.tv_nsec == right->st_mtimespec.tv_nsec &&
+           left->st_ctimespec.tv_sec == right->st_ctimespec.tv_sec &&
+           left->st_ctimespec.tv_nsec == right->st_ctimespec.tv_nsec;
+#else
+    return left->st_dev == right->st_dev && left->st_ino == right->st_ino &&
+           left->st_size == right->st_size &&
+           left->st_mtim.tv_sec == right->st_mtim.tv_sec &&
+           left->st_mtim.tv_nsec == right->st_mtim.tv_nsec &&
+           left->st_ctim.tv_sec == right->st_ctim.tv_sec &&
+           left->st_ctim.tv_nsec == right->st_ctim.tv_nsec;
+#endif
+}
+
+static void remove_entry_locked(struct cache_entry **link) {
+    struct cache_entry *entry = *link;
+    *link = entry->next;
+    if (cache_tail == entry) {
+        cache_tail = NULL;
+        for (struct cache_entry *item = cache_head; item != NULL;
+             item = item->next) {
+            cache_tail = item;
+        }
+    }
+    cache_entries--;
+    cache_bytes -= entry->length;
+    free(entry->response);
+    free(entry);
 }
 
 // monotonic clock 기준 만료 시각이 지난 항목을 잠금 안에서 제거합니다.
@@ -355,8 +393,20 @@ int cache_lookup_send(int client_fd, const char *key) {
     size_t length = 0;
     pthread_mutex_lock(&cache_mutex);
     remove_expired_locked(&now);
-    for (struct cache_entry *entry = cache_head; entry != NULL; entry = entry->next) {
+    struct cache_entry **link = &cache_head;
+    while (*link != NULL) {
+        struct cache_entry *entry = *link;
         if (strcmp(entry->key, key) == 0) {
+            if (entry->has_file_source) {
+                struct stat current_stat;
+                if (stat(entry->file_source, &current_stat) < 0 ||
+                    !same_file_version(&entry->file_source_stat,
+                                       &current_stat)) {
+                    // 정적 파일이 바뀌었거나 사라졌으면 HIT 대신 원본을 다시 읽습니다.
+                    remove_entry_locked(link);
+                    break;
+                }
+            }
             copy = malloc(entry->length);
             if (copy != NULL) {
                 memcpy(copy, entry->response, entry->length);
@@ -364,6 +414,7 @@ int cache_lookup_send(int client_fd, const char *key) {
             }
             break;
         }
+        link = &entry->next;
     }
     pthread_mutex_unlock(&cache_mutex);
     if (copy == NULL) return 0;
@@ -399,6 +450,18 @@ int cache_capture_begin(struct cache_capture *capture, int client_fd,
     pthread_mutex_lock(&cache_mutex);
     capture->generation = cache_generation;
     pthread_mutex_unlock(&cache_mutex);
+    return 0;
+}
+
+int cache_capture_set_file_source(struct cache_capture *capture,
+                                  const char *path,
+                                  const struct stat *source_stat) {
+    if (capture == NULL || path == NULL || source_stat == NULL) return -1;
+    size_t length = strlen(path);
+    if (length == 0 || length >= sizeof(capture->file_source)) return -1;
+    memcpy(capture->file_source, path, length + 1);
+    capture->file_source_stat = *source_stat;
+    capture->has_file_source = 1;
     return 0;
 }
 
@@ -498,6 +561,12 @@ int cache_capture_finish(struct cache_capture *capture) {
         if (entry != NULL && saved != NULL &&
             clock_gettime(CLOCK_MONOTONIC, &now) == 0) {
             memcpy(entry->key, capture->key, strlen(capture->key) + 1);
+            entry->has_file_source = capture->has_file_source;
+            if (capture->has_file_source) {
+                memcpy(entry->file_source, capture->file_source,
+                       strlen(capture->file_source) + 1);
+                entry->file_source_stat = capture->file_source_stat;
+            }
             memcpy(saved, capture->response, capture->response_len);
             entry->response = saved;
             saved = NULL;
