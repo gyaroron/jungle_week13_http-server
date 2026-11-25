@@ -26,8 +26,9 @@ const char *resp_reason(int status) {
     }
 }
 
-int resp_send_head(int fd, int status, const char *content_type,
-                   long content_length, int keep_alive) {
+int resp_format_head(char *header, size_t capacity, int status,
+                     const char *content_type, long content_length,
+                     int keep_alive) {
     char date[64] = "Thu, 01 Jan 1970 00:00:00 GMT";
     time_t now = time(NULL);
     struct tm utc;
@@ -35,8 +36,7 @@ int resp_send_head(int fd, int status, const char *content_type,
         strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S GMT", &utc);
     }
 
-    char header[1024];
-    int length = snprintf(header, sizeof(header),
+    int length = snprintf(header, capacity,
                           "HTTP/1.1 %d %s\r\n"
                           "Content-Type: %s\r\n"
                           "Content-Length: %ld\r\n"
@@ -46,7 +46,16 @@ int resp_send_head(int fd, int status, const char *content_type,
                           status, resp_reason(status),
                           content_type != NULL ? content_type : "application/octet-stream",
                           content_length, keep_alive ? "keep-alive" : "close", date);
-    if (length < 0 || (size_t)length >= sizeof(header)) {
+    if (length < 0 || (size_t)length >= capacity) return -1;
+    return length;
+}
+
+int resp_send_head(int fd, int status, const char *content_type,
+                   long content_length, int keep_alive) {
+    char header[1024];
+    int length = resp_format_head(header, sizeof(header), status,
+                                  content_type, content_length, keep_alive);
+    if (length < 0) {
         static const char fallback[] =
             "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         return net_send_all(fd, fallback, sizeof(fallback) - 1);
