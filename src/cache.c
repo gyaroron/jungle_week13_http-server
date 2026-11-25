@@ -258,7 +258,7 @@ int cache_request_unlock(void) {
 }
 
 static int transformed_header(const unsigned char *raw, size_t raw_length,
-                              const char *cache_status,
+                              const char *cache_status, int keep_alive,
                               unsigned char **out, size_t *out_length,
                               int *status, size_t *content_length,
                               int *has_content_length, int *safe_to_store,
@@ -348,9 +348,11 @@ static int transformed_header(const unsigned char *raw, size_t raw_length,
         }
         pos = line_end + 2;
     }
+    // 본문 길이를 알 때만 연결을 유지해야 다음 요청과의 경계가 분명합니다.
+    int keep = keep_alive && *has_content_length;
     int added = snprintf((char *)built + used, capacity - used,
-                         "X-Cache: %s\r\nConnection: close\r\n\r\n",
-                         cache_status);
+                         "X-Cache: %s\r\nConnection: %s\r\n\r\n",
+                         cache_status, keep ? "keep-alive" : "close");
     if (added < 0 || (size_t)added >= capacity - used) {
         free(built);
         return -1;
@@ -362,11 +364,11 @@ static int transformed_header(const unsigned char *raw, size_t raw_length,
 }
 
 static int send_transformed(int fd, const unsigned char *raw, size_t length,
-                            const char *status) {
+                            const char *status, int keep_alive) {
     unsigned char *header = NULL;
     size_t header_length = 0, expected = 0, ttl_seconds = 0;
     int code, has_length, safe;
-    int result = transformed_header(raw, length, status, &header,
+    int result = transformed_header(raw, length, status, keep_alive, &header,
                                     &header_length, &code, &expected,
                                     &has_length, &safe, &ttl_seconds);
     (void)expected;
@@ -385,7 +387,7 @@ static int send_transformed(int fd, const unsigned char *raw, size_t length,
     return length > raw_end ? net_send_all(fd, raw + raw_end, length - raw_end) : 0;
 }
 
-int cache_lookup_send(int client_fd, const char *key) {
+int cache_lookup_send(int client_fd, const char *key, int keep_alive) {
     if (key == NULL) return 0;
     struct timespec now;
     if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) return 0;
@@ -418,7 +420,7 @@ int cache_lookup_send(int client_fd, const char *key) {
     }
     pthread_mutex_unlock(&cache_mutex);
     if (copy == NULL) return 0;
-    int result = send_transformed(client_fd, copy, length, "HIT");
+    int result = send_transformed(client_fd, copy, length, "HIT", keep_alive);
     free(copy);
     return result < 0 ? -1 : 1;
 }
@@ -465,6 +467,12 @@ int cache_capture_set_file_source(struct cache_capture *capture,
     return 0;
 }
 
+int cache_capture_set_keep_alive(struct cache_capture *capture, int keep_alive) {
+    if (capture == NULL) return -1;
+    capture->keep_alive = keep_alive;
+    return 0;
+}
+
 int cache_capture_write(struct cache_capture *capture,
                         const void *data, size_t length) {
     if (capture == NULL || data == NULL || length == 0) return 0;
@@ -494,11 +502,14 @@ int cache_capture_write(struct cache_capture *capture,
         size_t transformed_len = 0;
         int has_length, safe;
         size_t response_ttl = 0;
-        int parsed = transformed_header(capture->pending, end, "MISS", &header,
+        int parsed = transformed_header(capture->pending, end, "MISS",
+                                        capture->keep_alive, &header,
                                         &transformed_len, &capture->status,
                                         &capture->expected_length,
                                         &has_length, &safe, &response_ttl);
         capture->ttl_seconds = response_ttl;
+        // 실제로 보낸 Connection 헤더 값을 남겨 연결 처리기가 같은 결정을 따르게 합니다.
+        if (parsed == 1) capture->keep_alive = capture->keep_alive && has_length;
         capture->cacheable_response = parsed == 1 && safe && has_length &&
                                       capture->status == 200 && response_ttl > 0;
         if (parsed != 1) {

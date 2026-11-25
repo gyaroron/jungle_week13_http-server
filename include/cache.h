@@ -29,6 +29,7 @@ struct cache_capture {
     size_t body_length;
     size_t ttl_seconds;
     uint64_t generation;
+    int keep_alive;
     int has_file_source;
     char file_source[CACHE_SOURCE_MAX];
     struct stat file_source_stat;
@@ -38,8 +39,9 @@ struct cache_capture {
 int cache_key_for_request(const struct http_request *req,
                           char *key, size_t key_capacity);
 
-/* Return 1 after sending a HIT, 0 on a miss or cache failure, -1 on send error. */
-int cache_lookup_send(int client_fd, const char *key);
+/* Return 1 after sending a HIT, 0 on a miss or cache failure, -1 on send error.
+ * 저장 응답은 항상 Content-Length가 있으므로 keep_alive를 그대로 표시할 수 있습니다. */
+int cache_lookup_send(int client_fd, const char *key, int keep_alive);
 
 /* Capture a GET response while streaming it; only complete 200 responses are stored. */
 int cache_capture_begin(struct cache_capture *capture, int client_fd,
@@ -47,6 +49,8 @@ int cache_capture_begin(struct cache_capture *capture, int client_fd,
 int cache_capture_set_file_source(struct cache_capture *capture,
                                  const char *path,
                                  const struct stat *source_stat);
+/* 길이가 정해진 응답(정적 파일)만 MISS 응답에 keep-alive를 표시하도록 켭니다. */
+int cache_capture_set_keep_alive(struct cache_capture *capture, int keep_alive);
 int cache_capture_write(struct cache_capture *capture,
                         const void *data, size_t length);
 int cache_capture_finish(struct cache_capture *capture);

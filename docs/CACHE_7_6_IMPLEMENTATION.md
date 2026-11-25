@@ -11,8 +11,8 @@
 ## 처리 흐름
 
 1. `cache_key_for_request()`는 GET 요청의 절대 URL을 만든다. absolute-form 대상은 그대로 사용하고, origin-form 대상은 `Host`와 경로를 결합한다.
-2. `cache_lookup_send()`는 뮤텍스를 잡고 키를 찾는다. 찾으면 응답 데이터를 별도 메모리에 복사한 뒤 뮤텍스를 풀고, 클라이언트에 `X-Cache: HIT`와 함께 보낸다.
-3. 미스면 `cache_capture_write()`가 리버스 프록시 응답 또는 정적 파일 응답을 받으며 클라이언트로 중계한다. 응답 헤더를 받은 뒤 `X-Cache: MISS`와 `Connection: close`를 붙인다.
+2. `cache_lookup_send()`는 뮤텍스를 잡고 키를 찾는다. 찾으면 응답 데이터를 별도 메모리에 복사한 뒤 뮤텍스를 풀고, 클라이언트에 `X-Cache: HIT`와 함께 보낸다. 저장 응답은 항상 `Content-Length`가 있으므로 클라이언트가 원하면 `Connection: keep-alive`로 연결을 유지한다.
+3. 미스면 `cache_capture_write()`가 리버스 프록시 응답 또는 정적 파일 응답을 받으며 클라이언트로 중계한다. 응답 헤더를 받은 뒤 `X-Cache: MISS`와 `Connection` 헤더를 붙인다. 정적 파일은 `cache_capture_set_keep_alive()`로 클라이언트 요청을 따르며 `Content-Length`가 있을 때만 `keep-alive`를 보낸다. 리버스·포워드 프록시 MISS는 업스트림 EOF까지 중계하므로 `close`를 유지한다. `conn.c`는 실제로 보낸 값(`capture->keep_alive`)을 보고 연결 유지 여부를 정한다.
 4. 응답이 끝나면 `cache_capture_finish()`가 상태 200, `Content-Length`와 실제 본문 길이의 일치 여부, 크기 제한을 확인한 뒤 저장한다. 기본 만료 시간은 5초이며, 원 서버가 더 짧은 `max-age` 또는 `s-maxage`를 지정하면 그 시간에 만료한다.
 5. 저장 공간이 부족하면 연결 리스트의 가장 오래된 항목부터 제거한다.
 6. 조회할 때 단조 시계(monotonic clock)로 만료된 항목을 지운다. wall clock(시스템 시각)이 조정되어도 만료 시간이 뒤로 돌아가지 않는다.
@@ -39,7 +39,7 @@
 - `src/cache.c:120–188`: 원 서버의 Cache-Control 지시를 해석해 캐시 금지와 더 짧은 TTL을 적용
 - `src/cache.c:223–239`: GET 및 민감·조건부 요청 제외, 절대 URL 키 구성
 - `src/cache.c:241–258`: GET 읽기 잠금, 비-GET 쓰기 잠금의 획득과 해제
-- `src/cache.c:260–367`: 상태 줄·헤더 분석, `X-Cache`와 `Connection: close` 구성, 저장 제외 응답 판정
+- `src/cache.c:260–367`: 상태 줄·헤더 분석, `X-Cache`와 `Connection`(keep-alive/close) 구성, 저장 제외 응답 판정
 - `src/cache.c:388–423`: 만료 항목 정리, 정적 파일 현재 상태 검사, 응답 복사와 HIT 전송
 - `src/cache.c:443–620`: MISS 응답 캡처·중계, 파일 출처 정보와 세대 번호 저장, 200/길이 확인, TTL 설정, FIFO 저장
 - `src/static.c:126–133`: 요청 경로와 열린 정적 파일의 `fstat()` 정보를 캐시 캡처에 연결

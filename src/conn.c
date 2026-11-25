@@ -256,15 +256,16 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 char cache_key[CACHE_KEY_MAX];
                 if (strncmp(req.target, "/cgi-bin/", 9) != 0 &&
                     cache_key_for_request(&req, cache_key, sizeof(cache_key))) {
-                    int cache_result = cache_lookup_send(c.fd, cache_key);
+                    int cache_result = cache_lookup_send(c.fd, cache_key,
+                                                         c.keep_alive);
                     if (cache_result < 0) {
                         cache_request_unlock();
                         conn_set_state(&c, CONN_CLOSING);
                         break;
                     }
                     if (cache_result > 0) {
+                        // HIT 응답은 저장된 Content-Length로 끝나므로 연결을 유지할 수 있습니다.
                         c.response_sent = 1;
-                        c.keep_alive = 0;
                         cache_request_unlock();
                         conn_set_state(&c, CONN_RESPONDING);
                         break;
@@ -312,6 +313,8 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     conn_set_state(&c, CONN_CLOSING);
                     break;
                 }
+                if (capture_ptr != NULL && !capture_ptr->keep_alive)
+                    c.keep_alive = 0;
                 if (capture_ptr != NULL && cache_capture_finish(capture_ptr) < 0) {
                     cache_request_unlock();
                     conn_set_state(&c, CONN_CLOSING);
@@ -323,7 +326,9 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     break;
                 }
                 c.response_sent = 1;
-                if (serve_result > 0 || proxy_handled || capture_ptr != NULL)
+                // 오류 응답과 프록시 중계(업스트림 EOF까지 전달)는 연결을 닫습니다.
+                // 캐시 MISS 정적 응답은 cache_capture가 keep-alive 헤더를 맞춰 보냅니다.
+                if (serve_result > 0 || proxy_handled)
                     c.keep_alive = 0;
                 conn_set_state(&c, CONN_RESPONDING);
                 break;

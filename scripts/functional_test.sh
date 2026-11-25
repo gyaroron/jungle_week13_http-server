@@ -150,11 +150,19 @@ if grep -q 'Re-using existing connection' "$BUILD_DIR/keepalive.log"; then
     pass '연결 유지로 요청 두 건'
 else fail '연결 유지로 요청 두 건'; fi
 
-proxy_a=$(curl -sS --max-time 5 "http://127.0.0.1:$SERVER_PORT/api/")
-proxy_b=$(curl -sS --max-time 5 "http://127.0.0.1:$SERVER_PORT/api/")
+# 같은 URL은 GET 캐시가 응답하므로, 서로 다른 URL로 백엔드 분배를 확인합니다.
+proxy_a=$(curl -sS --max-time 5 "http://127.0.0.1:$SERVER_PORT/api/?rr=1")
+proxy_b=$(curl -sS --max-time 5 "http://127.0.0.1:$SERVER_PORT/api/?rr=2")
 if [[ "$proxy_a" == 'backend A' && "$proxy_b" == 'backend B' ]]; then
     pass '리버스 프록시 라운드 로빈'
 else fail "리버스 프록시 라운드 로빈 (A='$proxy_a', B='$proxy_b')"; fi
+
+# 같은 URL을 다시 요청하면 백엔드 대신 캐시가 같은 응답을 돌려줍니다.
+cache_body=$(curl -sS --max-time 5 -D "$BUILD_DIR/cache_headers.tmp" \
+    "http://127.0.0.1:$SERVER_PORT/api/?rr=1")
+if [[ "$cache_body" == 'backend A' ]] && grep -qi '^X-Cache: HIT' "$BUILD_DIR/cache_headers.tmp"; then
+    pass '같은 URL 재요청 캐시 HIT'
+else fail "같은 URL 재요청 캐시 HIT (body='$cache_body')"; fi
 
 status=$(status_for "http://127.0.0.1:$SERVER_PORT/dead/")
 [[ "$status" == 502 ]] && pass '꺼진 백엔드 HTTP 502' || fail "꺼진 백엔드 HTTP 502 (status=$status)"
