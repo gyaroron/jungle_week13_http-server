@@ -2,7 +2,6 @@
 #include "config.h"
 #include "log.h"
 #include "net.h"
-#include "pool.h"
 #include "route.h"
 
 #include <arpa/inet.h>
@@ -18,8 +17,6 @@
 
 static volatile sig_atomic_t g_stop = 0;
 static const struct config *g_worker_config = NULL;
-
-#define APP_QUEUE_CAP 128
 
 // 일꾼이 받은 연결 번호를 기존 연결 처리기에 전달합니다.
 static void serve_connection(int fd) {
@@ -110,16 +107,8 @@ int main(int argc, char **argv) {
     // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
     server_log("listening on %s:%d (fd %d)\n", cfg.host, cfg.port, listen_fd);
 
-    // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
+    // 연결 처리 함수가 요청 처리 설정을 읽도록 주소를 보관합니다.
     g_worker_config = &cfg;
-    struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
-                                      serve_connection);
-    if (workers == NULL) {
-        server_log_errno("pool_create", errno);
-        close(listen_fd);
-        cleanup_routes(routes, cfg.route_count);
-        return 1;
-    }
 
     // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
     while (!g_stop) {
@@ -181,15 +170,11 @@ int main(int argc, char **argv) {
         server_log("accepted fd %d from %s:%d\n", conn_fd, ip,
                    ntohs(peer.sin_port));
 
-        // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
-        if (pool_submit(workers, conn_fd) < 0) {
-            server_log_errno("pool_submit", errno);
-            close(conn_fd);
-        }
+        // 이 기준 모델은 accept()가 반환한 연결을 현재 main 스레드가 끝까지 처리합니다.
+        serve_connection(conn_fd);
     }
 
     close(listen_fd);
-    pool_shutdown(workers);
     server_log("server stopped\n");
     cleanup_routes(routes, cfg.route_count);
     return 0;
