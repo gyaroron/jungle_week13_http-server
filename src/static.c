@@ -3,6 +3,7 @@
 
 #include "static.h"
 
+#include "cache.h"
 #include "mime.h"
 #include "net.h"
 #include "response.h"
@@ -69,7 +70,9 @@ static int path_is_inside(const char *root, const char *file) {
     return file[root_len] == '\0' || file[root_len] == '/';
 }
 
-int static_serve(int fd, const struct config *cfg, const struct http_request *req) {
+int static_serve_cached(int fd, const struct config *cfg,
+                        const struct http_request *req,
+                        struct cache_capture *capture) {
     if (strcmp(req->method, "GET") != 0) return send_error_result(fd, 405);
 
     char decoded[PATH_MAX];
@@ -125,8 +128,18 @@ int static_serve(int fd, const struct config *cfg, const struct http_request *re
         return send_error_result(fd, 403);
     }
 
-    if (resp_send_head(fd, 200, mime_from_path(file_path),
-                       (long)file_stat.st_size, req->keep_alive) < 0) {
+    char response_head[1024];
+    int response_head_len = resp_format_head(response_head,
+                                             sizeof(response_head), 200,
+                                             mime_from_path(file_path),
+                                             (long)file_stat.st_size,
+                                             req->keep_alive);
+    int head_result = response_head_len < 0 ? -1 :
+        (capture != NULL ?
+         cache_capture_write(capture, response_head,
+                             (size_t)response_head_len) :
+         net_send_all(fd, response_head, (size_t)response_head_len));
+    if (head_result < 0) {
         close(file_fd);
         return -1;
     }
@@ -141,11 +154,18 @@ int static_serve(int fd, const struct config *cfg, const struct http_request *re
             break;
         }
         if (n == 0) break;
-        if (net_send_all(fd, buffer, (size_t)n) < 0) {
+        int send_result = capture != NULL ?
+            cache_capture_write(capture, buffer, (size_t)n) :
+            net_send_all(fd, buffer, (size_t)n);
+        if (send_result < 0) {
             result = -1;
             break;
         }
     }
     close(file_fd);
     return result;
+}
+
+int static_serve(int fd, const struct config *cfg, const struct http_request *req) {
+    return static_serve_cached(fd, cfg, req, NULL);
 }

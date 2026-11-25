@@ -1,5 +1,6 @@
 #include "conn.h"
 #include "cgi.h"
+#include "cache.h"
 #include "http.h"
 #include "log.h"
 #include "net.h"
@@ -240,23 +241,46 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 req.keep_alive = c.keep_alive;
                 int serve_result = 0;
                 int proxy_handled = 0;
+                struct cache_capture capture;
+                struct cache_capture *capture_ptr = NULL;
+                char cache_key[CACHE_KEY_MAX];
+                if (strncmp(req.target, "/cgi-bin/", 9) != 0 &&
+                    cache_key_for_request(&req, cache_key, sizeof(cache_key))) {
+                    int cache_result = cache_lookup_send(c.fd, cache_key);
+                    if (cache_result < 0) {
+                        conn_set_state(&c, CONN_CLOSING);
+                        break;
+                    }
+                    if (cache_result > 0) {
+                        c.response_sent = 1;
+                        c.keep_alive = 0;
+                        conn_set_state(&c, CONN_RESPONDING);
+                        break;
+                    }
+                    if (cache_capture_begin(&capture, c.fd, cache_key) == 0) {
+                        capture_ptr = &capture;
+                    }
+                }
                 if (cfg->forward_proxy &&
                     (strncmp(req.target, "http://", 7) == 0 ||
                      strncmp(req.target, "https://", 8) == 0)) {
-                    serve_result = proxy_forward(c.fd, &req, c.body,
-                                                 c.body_len, cfg->timeout_sec,
-                                                 client_ip);
+                    serve_result = proxy_forward_cached(c.fd, &req, c.body,
+                                                        c.body_len,
+                                                        cfg->timeout_sec,
+                                                        client_ip, capture_ptr);
                     proxy_handled = 1;
                 } else {
-                    int reverse_result = proxy_reverse(c.fd, &req, c.body,
-                                                       c.body_len, cfg,
-                                                       client_ip);
+                    int reverse_result = proxy_reverse_cached(c.fd, &req, c.body,
+                                                              c.body_len, cfg,
+                                                              client_ip,
+                                                              capture_ptr);
                     if (reverse_result == PROXY_NO_ROUTE) {
                         if (strncmp(req.target, "/cgi-bin/", 9) == 0) {
                             serve_result = cgi_serve(c.fd, cfg, &req,
                                                      c.body, c.body_len);
                         } else {
-                            serve_result = static_serve(c.fd, cfg, &req);
+                            serve_result = static_serve_cached(c.fd, cfg, &req,
+                                                               capture_ptr);
                         }
                     } else {
                         serve_result = reverse_result == PROXY_FAILED ? -1 : 0;
@@ -264,14 +288,20 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     }
                 }
                 if (serve_result < 0) {
+                    cache_capture_abort(capture_ptr);
                     if (errno != EPIPE && errno != ECONNRESET) {
                         server_log_errno("static_serve", errno);
                     }
                     conn_set_state(&c, CONN_CLOSING);
                     break;
                 }
+                if (capture_ptr != NULL && cache_capture_finish(capture_ptr) < 0) {
+                    conn_set_state(&c, CONN_CLOSING);
+                    break;
+                }
                 c.response_sent = 1;
-                if (serve_result > 0 || proxy_handled) c.keep_alive = 0;
+                if (serve_result > 0 || proxy_handled || capture_ptr != NULL)
+                    c.keep_alive = 0;
                 conn_set_state(&c, CONN_RESPONDING);
                 break;
             }
