@@ -1,0 +1,9 @@
+Command: leaks --atExit -- ./build/server -p 18080 -w 4 -t 1
+The server handled two local HTTP requests and received SIGTERM.
+leaks exit status: 0
+
+Process 28065 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+leaks Report Version: 4.0, multi-line stacks
+Process 28065: 216 nodes malloced for 55 KB
+Process 28065: 0 leaks for 0 total leaked bytes.

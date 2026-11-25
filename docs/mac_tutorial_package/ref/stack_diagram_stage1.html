@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C 웹서버 · 프록시 스택 지도 — 1단계 (HTTP 메시지 흐름 · 소켓 상태 머신)</title>
+<style>
+:root{color-scheme:dark;--paper:#17191e;--paper2:#20232a;--rule:#2c3039;--rule2:#424854;--ink:#edf0f5;--muted:#a4acba;--blue:#7aa7ff;--orange:#f4b35e;--green:#76d18d;--red:#ff8585;--pink:#f472b6;--mono:Consolas,'SFMono-Regular',Menlo,monospace;--sans:'Pretendard','Apple SD Gothic Neo','Segoe UI',sans-serif}
+[data-theme=light]{color-scheme:light;--paper:#fbfbfa;--paper2:#f4f5f6;--rule:#e5e7eb;--rule2:#cbd0d8;--ink:#20242c;--muted:#697386;--blue:#2563eb;--orange:#d97706;--green:#15803d;--red:#dc2626;--pink:#db2777}
+*{box-sizing:border-box}
+body{margin:0;padding:32px 22px 48px;background:var(--paper);color:var(--ink);font:14px/1.6 var(--sans)}
+.page{max-width:1440px;margin:auto}
+.head{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--rule2);padding-bottom:18px;margin-bottom:22px}
+.kicker,.mono{font-family:var(--mono);font-size:11px;color:var(--blue);letter-spacing:.04em}
+h1{margin:5px 0;font-size:28px;line-height:1.2}
+.lede{max-width:760px;color:var(--muted);margin:6px 0 0}
+.theme{background:var(--paper2);color:var(--ink);border:1px solid var(--rule2);border-radius:7px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+.panel{border:1px solid var(--rule2);border-radius:10px;padding:16px;background:var(--paper2);margin:0 0 18px}
+.panel h3{margin:0 0 8px;font-size:15px}
+.panel p{margin:7px 0;color:var(--muted);font-size:13px}
+.panel ul{padding-left:20px;margin:8px 0;color:var(--muted);font-size:13px}
+.panel li{margin:5px 0}
+.panel code{font-family:var(--mono);color:var(--ink);font-size:12px}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.fact{border:1px solid var(--rule2);background:var(--paper2);border-radius:9px;padding:12px 14px}
+.fact b{display:block;font-size:15px}
+.fact span{font-size:12px;color:var(--muted)}
+.stackmap{margin:18px 0 22px;border:1px solid var(--rule2);border-radius:12px;background:var(--paper2);padding:16px}
+.stackmap h2{margin:0 0 4px;font-size:19px}
+.mapintro{color:var(--muted);font-size:13px;margin:4px 0 12px}
+.stepbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+.stepbar button,.stepbar select{background:var(--paper);color:var(--ink);border:1px solid var(--rule2);border-radius:6px;padding:7px 10px;cursor:pointer;font:inherit;font-size:13px}
+.stepbar button:hover{border-color:var(--blue)}
+.stepcount{font:12px var(--mono);color:var(--muted);min-width:76px}
+.kbdhint{font-size:12px;color:var(--muted);opacity:.45}
+.stackmap.kbd{border-color:var(--pink)}
+.stackmap.kbd .kbdhint{color:var(--pink);opacity:1}
+.stepinfo{border-left:3px solid var(--pink);padding:7px 11px;margin:9px 0;background:var(--paper);font-size:13px}
+.stepinfo b,.function-label{color:var(--pink)}
+.stepinfo span{color:var(--muted)}
+.map-scroll{overflow-x:auto;border:1px solid var(--rule2);border-radius:9px;background:var(--paper)}
+.stack-svg{display:block;width:100%;min-width:1120px;height:auto;background-image:linear-gradient(var(--rule) 1px,transparent 1px),linear-gradient(90deg,var(--rule) 1px,transparent 1px);background-size:20px 20px}
+.lane-bg{fill:var(--paper2);stroke:var(--rule2);stroke-dasharray:4 5;opacity:.75}
+.lane-title{fill:var(--muted);font:700 12px var(--mono)}
+.lifeline{stroke:var(--rule2);stroke-width:1.2;stroke-dasharray:5 6}
+.stack-node{fill:var(--paper);stroke:var(--rule2);stroke-width:1.4}
+.stack-node.client{stroke:#818cf8}.stack-node.proxy{stroke:#f59e0b}.stack-node.backend{stroke:#38bdf8}.stack-node.note{stroke:#a78bfa;stroke-dasharray:4 3}
+.stack-node.open{stroke:#a78bfa}.stack-node.data{stroke:#34d399}.stack-node.active-close{stroke:#fb923c}.stack-node.passive-close{stroke:#f472b6}.stack-node.end{stroke:#94a3b8}
+.node-title{fill:var(--ink);font:700 14px var(--sans)}
+.node-copy{fill:var(--muted);font:12px var(--sans)}
+.sent{cursor:pointer;outline:none}
+.sent:hover,.sent:focus{fill:var(--pink);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.unit{cursor:pointer;outline:none}
+.unit:hover .stack-node,.unit:focus .stack-node,.unit.active .stack-node{stroke:var(--pink);stroke-width:3}
+.unit.active .node-title,.sent.active{fill:var(--pink)}
+.edge-base{fill:none;stroke:#7c8491;stroke-width:1.5;marker-end:url(#map-arrow);opacity:.85}
+.edge-base.both{marker-start:url(#map-arrow)}
+.edge-base.dash{stroke-dasharray:6 5}
+.edge-active{fill:none;stroke:var(--active-color,#67e8f9);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#map-arrow-active);opacity:0}
+.edge-group.active .edge-active{opacity:1}
+.edge-label{font:650 12px var(--sans);fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:6px;stroke-linejoin:round;text-anchor:middle}
+.edge-group.active .edge-label{fill:var(--active-color,#67e8f9)}
+.edge-group{cursor:pointer;outline:none}
+.edge-group:hover .edge-base,.edge-group:focus .edge-base{stroke:var(--pink);stroke-width:4;opacity:1}
+.edge-group:hover .edge-label,.edge-group:focus .edge-label{fill:var(--pink)}
+.trans{fill:none;stroke:#7c8491;stroke-width:1.5;marker-end:url(#map-arrow)}
+.trans-label{font:12px var(--sans);fill:var(--muted);paint-order:stroke;stroke:var(--paper);stroke-width:6px;stroke-linejoin:round;text-anchor:middle}
+.mapkey{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:10px}
+.sw{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.road{width:100%;border-collapse:collapse;font-size:13px}
+.road td,.road th{border-bottom:1px solid var(--rule);padding:8px;text-align:left;vertical-align:top}
+.road th{color:var(--muted)}
+.road tr.now td{color:var(--pink)}
+footer{margin-top:20px;color:var(--muted);font-size:12px}
+.backdrop{display:none;position:fixed;inset:0;background:#07090dcc;z-index:10}
+.backdrop.show{display:block}
+.tooltip{display:none;position:fixed;z-index:11;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,calc(100vw - 28px));max-height:calc(100vh - 32px);overflow:auto;background:#0c0e14;color:#e8edf5;border:1px solid #394153;border-radius:10px;box-shadow:0 20px 65px #000b;padding:18px}
+.tooltip.show{display:block}
+.tt-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dotted #ffffff50;padding-bottom:12px;gap:12px}
+.tt-title{display:flex;align-items:center;gap:12px}
+.icon{flex:none;width:42px;height:42px;display:grid;place-items:center;border:2px solid #84cc16;color:#a3e635;border-radius:9px;font:bold 16px var(--mono);box-shadow:0 0 13px #84cc1640}
+.tt-title h2{font-size:16px;margin:0;line-height:1.4}
+.tt-title small{color:#9ba6bb}
+.close{background:none;color:#cbd5e1;border:0;font-size:24px;cursor:pointer;line-height:1}
+.tt-section{padding:11px 0;border-bottom:1px dotted #ffffff35}
+.tt-section:last-child{border-bottom:0}
+.tt-section>h3{font-size:12px;color:#fde047;margin:0 0 7px}
+.meta{display:grid;grid-template-columns:84px 1fr;gap:5px;font-size:12px}
+.meta b{color:#94a3b8}
+.meta code{color:#7dd3fc;overflow-wrap:anywhere;font-family:var(--mono)}
+.meta .lines{color:#fbbf24}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:#1e3a8a;color:#bfdbfe}
+.analysis-item{padding:10px 0;border-bottom:1px dotted rgba(255,255,255,.18)}
+.analysis-item:last-child{border-bottom:0}
+.analysis-item h3{margin:0 0 5px;color:#cbd5e1;font-size:12px}
+.analysis-item p{margin:0;color:#e2e8f0;font-size:13px;line-height:1.7;white-space:pre-wrap}
+.snippet{margin-top:6px;background:#080a0f;border:1px solid #334155;border-radius:9px;color:#e2e8f0;overflow:hidden}
+.code-file{padding:10px 14px;background:#172033;color:#93c5fd;font:600 12px/1.6 var(--mono);overflow-wrap:anywhere;border-bottom:1px solid #334155}
+.code-row{padding:12px 14px;border-bottom:1px solid #253146}
+.code-row:last-child{border-bottom:0}
+.code-source{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:start}
+.code-number{color:#fbbf24;font:12px/1.75 var(--mono);user-select:none}
+.code-source pre{margin:0;padding:0 0 5px;white-space:pre;overflow-x:auto;font:13px/1.65 var(--mono);color:#e2e8f0}
+.code-note{margin:8px 0 0 58px;padding:9px 12px;border-left:3px solid #38bdf8;background:#122031;color:#dbeafe;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.75 var(--sans)}
+@media(max-width:760px){body{padding:20px 12px}.head{align-items:start;flex-direction:column}.facts{grid-template-columns:repeat(2,1fr)}.code-note{margin-left:0}.code-source{grid-template-columns:38px minmax(0,1fr);gap:6px}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="head"><div><div class="kicker">KRAFTON JUNGLE · C WEB SERVER · PROXY · STACK MAP · STEP 1 / 9</div><h1>C 웹서버 · 프록시 만들기 — 1단계</h1><p class="lede">요청 한 개가 클라이언트에서 프록시 서버를 거쳐 백엔드까지 갔다가 돌아오는 전체 HTTP 메시지 흐름과, 그동안 서버 쪽 소켓이 거치는 TCP 상태 머신입니다. 카드의 문장 · 화살표 · 상태를 누르면 가운데 창에서 근거 줄과 해석을 볼 수 있습니다.</p></div><button class="theme" type="button" onclick="toggleTheme()">테마 전환</button></header>
+
+<section class="panel" style="border-left:4px solid var(--pink)"><p style="margin:0 0 8px"><b>이 지도의 근거와 한계</b></p><ul style="margin:0">
+<li><b>구현 소스 코드는 아직 없습니다.</b> 그래서 모든 창의 “확인” 칸과 발췌는 작업 범위로 정한 두 md 파일의 실제 줄 번호와 그 줄의 원문입니다. 지어낸 C 코드를 원본처럼 싣지 않았습니다.</li>
+<li>근거 파일 1: <code>C 웹서버 · 프록시 구현 요구사항 라인 바이 라인 정밀 해석 — … 24개 항목.md</code> (요구사항 파일)</li>
+<li>근거 파일 2: <code>C 웹서버_AI 함께하기 가이드 라인 바이 라인 정밀 해석 — … 31개 항목.md</code> (가이드 파일)</li>
+<li>실행 환경은 <b>macOS</b>를 전제로 합니다. 창에 적힌 확인 명령(<code>netstat -an -p tcp</code>, <code>lsof</code>, <code>sysctl</code>)은 macOS에 있는 명령입니다. Linux 전용인 <code>ss</code> · <code>epoll</code> · <code>accept4</code>는 쓰지 않습니다.</li>
+<li>“예상” 칸은 설계로 기대하는 결과이고, 아직 실행해서 잰 값이 아닙니다. 이 파일에는 측정 수치가 하나도 없습니다.</li>
+</ul></section>
+
+<div class="facts"><div class="fact"><b>C · POSIX 소켓</b><span>외부 HTTP 라이브러리 없이 구현</span></div><div class="fact"><b>연결 2개</b><span>클라이언트 쪽 1개 + 업스트림 쪽 1개</span></div><div class="fact"><b>화살표 ① ~ ⑦</b><span>요청 한 개의 한 바퀴</span></div><div class="fact"><b>TCP 상태 10개</b><span>여는 길 1개 · 닫는 길 2개</span></div></div>
+
+<section class="stackmap" aria-labelledby="flowTitle"><h2 id="flowTitle">A. 전체 HTTP 메시지 흐름 · 클라이언트 → 프록시 서버 → 백엔드 / 원 서버</h2><p class="mapintro">얇은 회색 선 ① ~ ⑦은 항상 보입니다. 시나리오와 단계를 고르면 지금 단계의 선이나 카드가 굵은 색으로 강조되고, 분홍 글자는 그 단계에서 불리는 함수입니다.</p>
+<div class="stepbar"><label for="scenarioA" class="mono">시나리오</label><select id="scenarioA"><option value="reverse">Reverse Proxy · 백엔드로 전달</option><option value="forward">Forward Proxy · 원 서버로 전달</option></select><button id="prevA" type="button">← 이전</button><button id="nextA" type="button">다음 →</button><span id="countA" class="stepcount"></span><span class="kbdhint">키보드 ← → 로도 넘길 수 있습니다</span></div>
+<div class="stepinfo" aria-live="polite"><b id="fnA"></b>　<span id="textA"></span></div>
+<div class="map-scroll"><svg class="stack-svg" viewBox="0 0 1360 620" role="img" aria-label="클라이언트, 프록시 서버, 백엔드 사이를 오가는 일곱 개 메시지의 순서도"><defs><marker id="map-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#7c8491"/></marker><marker id="map-arrow-active" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="context-stroke"/></marker></defs>
+<rect class="lane-bg" x="40" y="12" width="340" height="596" rx="12"/><rect class="lane-bg" x="420" y="12" width="540" height="596" rx="12"/><rect class="lane-bg" x="1000" y="12" width="320" height="596" rx="12"/>
+<text class="lane-title" x="60" y="38">01 · CLIENT</text><text class="lane-title" x="440" y="38">02 · PROXY SERVER (macOS)</text><text class="lane-title" x="1020" y="38">03 · BACKEND / ORIGIN</text>
+<line class="lifeline" x1="210" y1="156" x2="210" y2="600"/><line class="lifeline" x1="680" y1="156" x2="680" y2="600"/><line class="lifeline" x1="1160" y1="156" x2="1160" y2="600"/>
+<g class="module-card"><rect class="stack-node client" x="60" y="54" width="300" height="100" rx="10"/><text class="node-title sent" data-rec="c1" x="78" y="84">클라이언트 · curl / 브라우저</text><text class="node-copy sent" data-rec="c2" x="78" y="110">connect() → send() → recv()</text><text class="node-copy sent" data-rec="c3" x="78" y="134">macOS 확인: netstat -an -p tcp</text></g>
+<g class="module-card"><rect class="stack-node proxy" x="530" y="54" width="300" height="100" rx="10"/><text class="node-title sent" data-rec="p1" x="548" y="84">프록시 서버 · 프로세스 한 개</text><text class="node-copy sent" data-rec="p2" x="548" y="110">socket → bind → listen → accept</text><text class="node-copy sent" data-rec="p3" x="548" y="134">클라이언트 fd + 업스트림 fd</text></g>
+<g class="module-card"><rect class="stack-node backend" x="1010" y="54" width="300" height="100" rx="10"/><text class="node-title sent" data-rec="b1" x="1028" y="84">백엔드 1..N · 원 서버</text><text class="node-copy sent" data-rec="b2" x="1028" y="110">reverse: /api/* → 8001 같은 규칙</text><text class="node-copy sent" data-rec="b3" x="1028" y="134">forward: 요청 URL의 호스트로</text></g>
+<g class="edge-group" data-rec="e1"><path class="edge-base" d="M214 200H672"/><path class="edge-active" d="M214 200H672"/><text class="edge-label" x="445" y="189">① TCP 연결 맺기 (SYN · SYN-ACK · ACK)</text></g>
+<g class="unit" data-rec="n1"><rect class="stack-node note" x="694" y="214" width="256" height="40" rx="8"/><text class="node-copy" x="706" y="239">accept()가 연결 fd를 돌려준다</text></g>
+<g class="edge-group" data-rec="e2"><path class="edge-base" d="M214 300H672"/><path class="edge-active" d="M214 300H672"/><text class="edge-label" x="445" y="289">② HTTP 요청 (요청 줄 · 헤더 · 빈 줄 · 본문)</text></g>
+<g class="unit" data-rec="n2"><rect class="stack-node note" x="694" y="314" width="256" height="40" rx="8"/><text class="node-copy" x="706" y="339">recv() 반복 → 빈 줄까지 파싱 → 라우팅</text></g>
+<g class="edge-group" data-rec="e3"><path class="edge-base" d="M684 400H1152"/><path class="edge-active" d="M684 400H1152"/><text class="edge-label" x="920" y="389">③ connect() · 업스트림 TCP 연결</text></g>
+<g class="edge-group" data-rec="e4"><path class="edge-base" d="M684 445H1152"/><path class="edge-active" d="M684 445H1152"/><text class="edge-label" x="920" y="434">④ 고친 요청 send()</text></g>
+<g class="edge-group" data-rec="e5"><path class="edge-base" d="M1156 490H688"/><path class="edge-active" d="M1156 490H688"/><text class="edge-label" x="920" y="479">⑤ 응답 recv() (상태 줄 · 헤더 · 본문)</text></g>
+<g class="edge-group" data-rec="e6"><path class="edge-base" d="M676 535H218"/><path class="edge-active" d="M676 535H218"/><text class="edge-label" x="445" y="524">⑥ 응답 중계 send() 반복</text></g>
+<g class="edge-group" data-rec="e7"><path class="edge-base both dash" d="M218 580H672"/><path class="edge-active" d="M218 580H672"/><text class="edge-label" x="445" y="569">⑦ keep-alive면 ②로 · 아니면 close()</text></g>
+</svg></div>
+<div class="mapkey"><span><i class="sw" style="border-color:#7c8491"></i>조사한 연결 (항상 보임)</span><span><i class="sw" style="border-color:#67e8f9"></i>지금 단계의 연결</span><span><i class="sw" style="border-color:#f472b6"></i>지금 단계의 함수 · 마우스를 올린 대상</span><span><i class="sw" style="border-color:#a78bfa;border-top-style:dashed"></i>프록시 안에서 일어나는 일</span></div>
+</section>
+
+<section class="stackmap" aria-labelledby="stateTitle"><h2 id="stateTitle">B. 서버 쪽 소켓의 TCP 상태 머신</h2><p class="mapintro">상태는 커널이 관리합니다. 선 위의 글자는 그 상태로 넘어가게 만드는 시스템 콜이나 패킷입니다. 상태 카드는 카드 하나가 항목 하나입니다.</p>
+<div class="stepbar"><label for="scenarioB" class="mono">시나리오</label><select id="scenarioB"><option value="server-first">서버가 먼저 닫는 길</option><option value="client-first">클라이언트가 먼저 닫는 길</option></select><button id="prevB" type="button">← 이전</button><button id="nextB" type="button">다음 →</button><span id="countB" class="stepcount"></span><span class="kbdhint">키보드 ← → 로도 넘길 수 있습니다</span></div>
+<div class="stepinfo" aria-live="polite"><b id="fnB"></b>　<span id="textB"></span></div>
+<div class="map-scroll"><svg class="stack-svg" viewBox="0 0 1360 700" role="img" aria-label="CLOSED에서 LISTEN, SYN_RCVD, ESTABLISHED를 거쳐 두 가지 닫는 길로 CLOSED에 이르는 상태도">
+<path class="trans" d="M390 82H536"/><text class="trans-label" x="463" y="71">bind() · listen()</text>
+<path class="trans" d="M820 82H966"/><text class="trans-label" x="893" y="71">SYN 도착</text>
+<path class="trans" d="M1110 124V152H680V176"/><text class="trans-label" x="895" y="141">ACK 도착 → accept()가 꺼냄</text>
+<path class="trans" d="M620 264V292H250V316"/><text class="trans-label" x="435" y="281">서버가 먼저 close()</text>
+<path class="trans" d="M740 264V292H1110V316"/><text class="trans-label" x="925" y="281">클라이언트 FIN 도착 → recv()가 0</text>
+<path class="trans" d="M250 404V446"/><text class="trans-label" style="text-anchor:start" x="264" y="430">내 FIN의 ACK 도착</text>
+<path class="trans" d="M250 534V576"/><text class="trans-label" style="text-anchor:start" x="264" y="560">상대 FIN 도착 → ACK 보냄</text>
+<path class="trans" d="M1110 404V446"/><text class="trans-label" style="text-anchor:end" x="1096" y="430">서버가 close() → FIN 보냄</text>
+<path class="trans" d="M1110 534V576"/><text class="trans-label" style="text-anchor:end" x="1096" y="560">마지막 ACK 도착</text>
+<path class="trans" d="M390 622H966"/><text class="trans-label" x="680" y="611">2 × MSL 기다린 뒤</text>
+<g class="unit" data-rec="s1"><rect class="stack-node open" x="110" y="40" width="280" height="84" rx="10"/><text class="node-title" x="128" y="72">CLOSED (시작)</text><text class="node-copy" x="128" y="100">socket() 직후 · 아직 주소 없음</text></g>
+<g class="unit" data-rec="s2"><rect class="stack-node open" x="540" y="40" width="280" height="84" rx="10"/><text class="node-title" x="558" y="72">LISTEN</text><text class="node-copy" x="558" y="100">연결 요청을 기다리는 소켓</text></g>
+<g class="unit" data-rec="s3"><rect class="stack-node open" x="970" y="40" width="280" height="84" rx="10"/><text class="node-title" x="988" y="72">SYN_RCVD</text><text class="node-copy" x="988" y="100">커널이 SYN-ACK을 보낸 상태</text></g>
+<g class="unit" data-rec="s4"><rect class="stack-node data" x="540" y="180" width="280" height="84" rx="10"/><text class="node-title" x="558" y="212">ESTABLISHED</text><text class="node-copy" x="558" y="240">recv() · send()로 바이트 교환</text></g>
+<g class="unit" data-rec="s5"><rect class="stack-node active-close" x="110" y="320" width="280" height="84" rx="10"/><text class="node-title" x="128" y="352">FIN_WAIT_1</text><text class="node-copy" x="128" y="380">내 FIN을 보내고 ACK 대기</text></g>
+<g class="unit" data-rec="s6"><rect class="stack-node active-close" x="110" y="450" width="280" height="84" rx="10"/><text class="node-title" x="128" y="482">FIN_WAIT_2</text><text class="node-copy" x="128" y="510">상대의 FIN을 기다리는 중</text></g>
+<g class="unit" data-rec="s7"><rect class="stack-node active-close" x="110" y="580" width="280" height="84" rx="10"/><text class="node-title" x="128" y="612">TIME_WAIT</text><text class="node-copy" x="128" y="640">늦게 온 패킷을 버리며 대기</text></g>
+<g class="unit" data-rec="s8"><rect class="stack-node passive-close" x="970" y="320" width="280" height="84" rx="10"/><text class="node-title" x="988" y="352">CLOSE_WAIT</text><text class="node-copy" x="988" y="380">상대가 닫음 · 내 close() 대기</text></g>
+<g class="unit" data-rec="s9"><rect class="stack-node passive-close" x="970" y="450" width="280" height="84" rx="10"/><text class="node-title" x="988" y="482">LAST_ACK</text><text class="node-copy" x="988" y="510">내 FIN의 ACK 대기</text></g>
+<g class="unit" data-rec="s10"><rect class="stack-node end" x="970" y="580" width="280" height="84" rx="10"/><text class="node-title" x="988" y="612">CLOSED (끝)</text><text class="node-copy" x="988" y="640">fd 반납 · 커널 자원 해제</text></g>
+</svg></div>
+<div class="mapkey"><span><i class="sw" style="border-color:#a78bfa"></i>연결 맺기</span><span><i class="sw" style="border-color:#34d399"></i>데이터 주고받기</span><span><i class="sw" style="border-color:#fb923c"></i>서버가 먼저 닫음 (active close)</span><span><i class="sw" style="border-color:#f472b6"></i>클라이언트가 먼저 닫음 (passive close)</span><span><i class="sw" style="border-color:#94a3b8"></i>끝</span></div>
+</section>
+
+<section class="panel"><h3>단계 로드맵 — 대화하면서 한 단계씩 채웁니다</h3>
+<table class="road"><thead><tr><th>단계</th><th>그리고 채울 내용</th><th>요구사항 파일 항목</th><th>가이드 파일 항목</th></tr></thead><tbody>
+<tr class="now"><td>1 (이 파일)</td><td>전체 HTTP 메시지 흐름 · TCP 소켓 상태 머신</td><td>2, 13</td><td>4, 9, 28, 31</td></tr>
+<tr><td>2</td><td>연결 하나의 앱 상태 머신: 읽기 → 파싱 → 처리 → 쓰기 → keep-alive 또는 닫기</td><td>3, 4, 14</td><td>4</td></tr>
+<tr><td>3</td><td>HTTP 파싱 세부: 요청 줄 · 헤더 · 본문 · 한도와 오류 코드</td><td>3, 14, 23</td><td>6</td></tr>
+<tr><td>4</td><td>시스템 콜 · 소켓 옵션 세부 (macOS 차이 포함)</td><td>2, 12, 13, 18</td><td>9</td></tr>
+<tr><td>5</td><td>처리기: 정적 파일 · CGI</td><td>5, 6</td><td>28</td></tr>
+<tr><td>6</td><td>동시성: 스레드 풀 · 공유 자원 · 메모리</td><td>7, 15, 17</td><td>4</td></tr>
+<tr><td>7</td><td>프록시: Reverse Proxy + Round-Robin · Forward Proxy</td><td>8, 9, 10, 16</td><td>9</td></tr>
+<tr><td>8</td><td>검증: 단위 · 기능 · 부하 · 메모리 · 엣지 케이스</td><td>19, 20, 21, 22, 23</td><td>13, 21</td></tr>
+<tr><td>9</td><td>정리물: 통합 지도 · macOS 작업 지시서 md · 학습 노트 · README 발표 구성</td><td>11, 12, 24</td><td>5, 7, 14, 15, 22</td></tr>
+</tbody></table></section>
+
+<footer>1단계 항목 수: A 지도 문장 9개 + 프록시 안 상자 2개 + 화살표 7개, B 지도 상태 10개 = 28개. 근거는 두 md 파일의 줄 번호이며 실행 측정값은 없습니다.</footer>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="tooltip" id="tooltip" role="dialog" aria-modal="true" aria-labelledby="ttTitle"><div class="tt-head"><div class="tt-title"><div class="icon" id="ttIcon">C</div><div><h2 id="ttTitle"></h2><small id="ttCat"></small></div></div><button class="close" type="button" aria-label="닫기" id="ttClose">×</button></div>
+<div class="tt-section"><div class="meta"><b>근거 파일</b><code id="ttFile"></code><b>근거 줄</b><code class="lines" id="ttLines"></code><b>출처 유형</b><span><span class="pill">요구사항 · 가이드 원문 (구현 소스 없음)</span></span></div></div>
+<div class="tt-section" id="ttAnalysis"></div>
+<div class="tt-section"><h3>근거 원문 발췌 · 줄별 주석</h3><div class="snippet" id="ttCode" aria-label="근거 원문과 줄별 해설"></div></div></aside>
+
+<script>
+const FILES={
+C:"C 웹서버 · 프록시 구현 요구사항 라인 바이 라인 정밀 해석 — TCP 소켓 · HTTP 파싱 · 동시성 · Forward · Reverse Proxy · 품질 검증 24개 항목.md",
+G:"C 웹서버_AI 함께하기 가이드 라인 바이 라인 정밀 해석 — 학습 목표 · 학습 키워드 · 과제 수행 원칙 · 주요 일정 · CSAPP 11장 31개 항목.md"};
+const EV={
+"C:155":"socket() → bind() → listen() → accept() 의 표준 흐름을 직접 구현합니다.",
+"C:156":"클라이언트 연결을 수락하고 요청 / 응답을 송수신합니다.",
+"C:182":"요청 라인 (메서드, URI, 버전) 파싱",
+"C:183":"헤더 파싱 (Host, Content-Length, Connection 등)",
+"C:184":"본문 (body) 처리 (POST 요청)",
+"C:211":"상태 라인 (HTTP/1.1 200 OK 등)",
+"C:212":"표준 헤더 (Content-Type, Content-Length, Connection 등)",
+"C:213":"본문 송신",
+"C:349":"• Forward Proxy 방식",
+"C:350":"클라이언트의 HTTP 요청을 받아 외부 서버에 대신 전달하고 응답을 그대로 돌려줍니다.",
+"C:351":"흐름: 클라이언트 → Proxy → 원 서버",
+"C:352":"요청 URL 의 호스트를 파악하여 새로운 TCP 연결을 만들고 데이터를 중계합니다.",
+"C:353":"선택적으로 캐싱 기능을 개발합니다.",
+"C:378":"• Reverse Proxy 방식",
+"C:379":"외부 요청을 받아 내부에 있는 여러 백엔드 서버로 라우팅합니다.",
+"C:380":"흐름: 클라이언트 → Reverse Proxy → 백엔드 (1 .. N)",
+"C:381":"가능하면 단순 로드 밸런싱 (Round-Robin 등) 까지 포함합니다.",
+"C:382":"라우팅 규칙은 경로 (/api/* → 8001, /static/* → 8002 …) 또는 호스트 헤더 기반으로 설계합니다.",
+"C:469":"3-way handshake, SO_REUSEADDR, blocking / non-blocking 차이",
+"C:470":"bind 실패 / accept 블로킹 등의 동작 원리",
+"C:496":"요청 라인 / 헤더 / 본문의 경계를 어떻게 식별할 것인가",
+"C:498":"Connection: keep-alive 의 의미와 처리",
+"C:605":"SIGINT / SIGTERM 안전한 셧다운",
+"C:606":"SIGPIPE 무시 (쓰기 도중 클라이언트 끊김 대응)",
+"C:739":"백엔드 서버 응답 없음 / 타임아웃 (Reverse Proxy 케이스)",
+"C:740":"클라이언트의 갑작스러운 연결 종료",
+"G:288":"•BSD소켓, IP, TCP, HTTP, file descriptor, DNS, 웹 서버, Proxy",
+"G:838":"•책의 내용이 어렵습니다. 네트워크가 어떻게 동작하는지 이해한다는 관점으로 접근해 보세요."};
+const LABELS=["직관적 1초 컷 독해","바로 읽기","이 조건이 없으면 생기는 대참사","예상","반응","의심","깨달음","확인","뉘앙스 / 의역"];
+const REC={
+c1:{t:"클라이언트 · curl / 브라우저",cat:"A 지도 · 클라이언트 카드",refs:["C:156","C:350"],
+notes:["서버가 수락하는 연결의 상대가 이 카드의 클라이언트다.","프록시에게도 요청을 처음 보내는 쪽은 클라이언트다."],
+d:["“요청을 처음 보내는 쪽이 누구인지부터 정하라는 거지?”",
+"클라이언트는 curl이나 브라우저처럼 TCP 연결을 먼저 걸고 HTTP 요청을 보내는 프로그램이다. 이 과제에서 클라이언트는 새로 만들지 않고 테스트 도구로 쓴다.",
+"클라이언트 역할을 정하지 않으면 프록시가 누구의 요청을 받고 누구에게 응답을 돌려주는지 흐려진다. 그러면 프록시가 응답을 백엔드 쪽 fd에 쓰는 실수가 생긴다.",
+"curl 요청 한 번이 화살표 ①부터 ⑦까지를 한 바퀴 돈다.",
+"브라우저는 페이지 하나를 위해 연결을 여러 개 동시에 연다. 서버가 연결 여러 개를 동시에 받을 수 있는지가 다음 질문이다.",
+"클라이언트가 요청을 절반만 보내고 멈추면 서버의 recv()는 언제까지 기다리는가?",
+"서버에게 클라이언트는 믿을 수 없는 입력원이다. 한도와 타임아웃은 모두 이 카드에서 오는 바이트를 막기 위해 있다.",
+"요구사항 파일 156행과 350행이 근거다. 구현 전이라 실행 테스트는 없다. 구현한 뒤 macOS에서 curl -v http://127.0.0.1:8080/ 로 요청과 응답을 눈으로 본다.",
+"그림의 맨 왼쪽 줄은 시작과 끝이 같은 곳이라는 표시다. 요청이 떠난 곳으로 응답이 돌아와야 한 바퀴가 닫힌다."]},
+c2:{t:"connect() → send() → recv()",cat:"A 지도 · 클라이언트 카드",refs:["C:155","C:156"],
+notes:["서버의 네 호출과 짝이 되는 클라이언트 쪽 호출이 connect()다.","서버의 송수신과 반대 방향으로 클라이언트가 send()와 recv()를 부른다."],
+d:["“클라이언트 쪽은 호출 세 개면 끝이라는 거지?”",
+"클라이언트 프로그램이 connect()로 서버에 TCP 연결을 걸고, send()로 요청 바이트를 보내고, recv()로 응답 바이트를 받는다.",
+"connect()와 accept()가 짝이라는 것을 모르면 프록시가 업스트림에 연결할 때 무엇을 불러야 하는지 알 수 없다. 프록시는 화살표 ③에서 클라이언트 역할을 한다.",
+"프록시 서버의 업스트림 쪽 코드는 이 세 호출을 그대로 쓴다.",
+"서버 쪽은 호출이 네 개인데 클라이언트 쪽은 왜 bind()와 listen()이 없는가?",
+"connect()가 실패하면 errno는 무엇이고, 연결 거부와 시간 초과를 어떻게 구분하는가?",
+"클라이언트는 포트를 고르지 않는다. 커널이 임시 포트를 골라 주기 때문에 bind()가 필요 없다.",
+"요구사항 파일 155행과 156행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서는 nc 127.0.0.1 8080 으로 connect()만 해 보고 손으로 요청을 쳐서 확인할 수 있다.",
+"서버가 문을 열고 기다리는 쪽이라면 클라이언트는 문을 두드리는 쪽이다. 프록시는 두 역할을 한 프로세스에서 다 한다."]},
+c3:{t:"macOS 확인: netstat -an -p tcp",cat:"A 지도 · 클라이언트 카드",refs:["C:469","C:470"],
+notes:["3-way handshake가 끝났는지는 netstat의 상태 칸으로 확인한다.","bind 실패는 같은 포트를 쓰는 소켓이 netstat 목록에 남아 있을 때 생긴다."],
+d:["“그림의 상태를 내 Mac에서 직접 보라는 거지?”",
+"사용자가 macOS 터미널에서 netstat -an -p tcp 를 실행하면 커널이 가진 TCP 소켓과 그 상태(LISTEN, ESTABLISHED, TIME_WAIT)를 줄마다 보여 준다.",
+"상태를 볼 줄 모르면 bind 실패나 연결 거부가 났을 때 서버가 떠 있는지, 포트가 남아 있는지 추측만 하게 된다.",
+"서버를 띄우면 8080 포트 줄에 LISTEN이 보이고, curl이 붙어 있는 동안 ESTABLISHED 줄이 하나 더 보인다.",
+"Linux 자료에 나오는 ss -ltnp 는 macOS에 없다. 같은 일을 하는 macOS 명령은 무엇인가?",
+"netstat 출력이 길 때 내 서버의 줄만 고르려면 grep으로 무엇을 걸러야 하는가?",
+"B 지도의 상태 이름은 책에만 있는 말이 아니라 운영체제가 실제로 보여 주는 값이다.",
+"요구사항 파일 469행과 470행이 근거다. 구현 전이라 실행 테스트는 없다. 확인 명령은 netstat -an -p tcp | grep 8080 과 lsof -nP -iTCP:8080 -sTCP:LISTEN 이다.",
+"이 줄은 지도를 눈으로만 보지 말고 터미널에서 대조하라는 안내다."]},
+p1:{t:"프록시 서버 · 프로세스 한 개",cat:"A 지도 · 프록시 서버 카드",refs:["C:349","C:378"],
+notes:["Forward Proxy 방식도 이 한 프로세스가 맡는다.","Reverse Proxy 방식도 같은 프로세스가 맡는다. 라우팅 규칙만 다르다."],
+d:["“가운데 낀 프로그램 하나가 양쪽을 다 상대하라는 거지?”",
+"프록시 서버는 클라이언트의 요청을 받아 다른 서버에 대신 보내고, 받은 응답을 클라이언트에 돌려주는 프로그램이다. 이 과제에서 직접 만드는 대상이다.",
+"프록시를 웹서버와 별개 프로그램으로 따로 짜면 소켓 · 파싱 · 응답 코드가 두 벌이 되고, 한쪽만 고친 버그가 다른 쪽에 남는다.",
+"웹서버 코드 위에 프록시 처리기를 더하는 구조가 되어 소켓 코드와 파서를 함께 쓴다.",
+"한 프로세스가 Forward와 Reverse를 둘 다 하려면 요청을 보고 어느 쪽인지 어떻게 고르는가?",
+"프록시가 죽으면 양쪽 연결이 모두 끊긴다. 종료 신호가 왔을 때 진행 중인 요청을 어떻게 마무리하는가?",
+"프록시는 서버이면서 클라이언트다. 왼쪽으로는 accept()하는 서버이고 오른쪽으로는 connect()하는 클라이언트다.",
+"요구사항 파일 349행과 378행이 근거다. 구현 전이라 실행 테스트는 없다. 구현한 뒤에는 macOS에서 lsof -nP -p <pid> -iTCP 로 한 프로세스가 가진 소켓을 모두 본다.",
+"가운데 줄은 통역사와 같은 자리다. 다만 번역하는 것이 아니라 바이트를 받아 그대로 또는 조금 고쳐 넘긴다."]},
+p2:{t:"socket → bind → listen → accept",cat:"A 지도 · 프록시 서버 카드",refs:["C:155","C:470"],
+notes:["네 호출의 순서가 요구사항에 그대로 적혀 있다.","bind 실패와 accept 블로킹은 이 순서의 둘째 · 넷째 호출에서 생기는 동작이다."],
+d:["“서버를 여는 순서는 이 네 개로 고정이라는 거지?”",
+"프록시 서버가 socket()으로 소켓을 만들고, bind()로 포트를 붙이고, listen()으로 연결 요청을 받기 시작하고, accept()로 완성된 연결을 하나씩 꺼낸다.",
+"순서를 바꾸거나 하나를 빼면 서버가 뜨지 않는다. bind() 없이 listen()하면 커널이 임의 포트를 골라 클라이언트가 서버를 찾지 못한다.",
+"네 호출이 성공하면 B 지도에서 소켓이 CLOSED에서 LISTEN으로 넘어가고, accept()가 ESTABLISHED인 새 fd를 준다.",
+"bind()와 listen() 사이, socket()과 bind() 사이에 넣어야 하는 소켓 옵션은 무엇인가? 4단계에서 채운다.",
+"accept()가 돌려주는 fd와 listen()에 쓴 fd는 같은 것인가?",
+"듣는 소켓과 연결 소켓은 서로 다른 fd다. 듣는 소켓은 하나뿐이고 연결 소켓은 클라이언트마다 하나씩 생긴다.",
+"요구사항 파일 155행과 470행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에는 accept4()가 없으므로 accept() 뒤에 fcntl()로 옵션을 붙이는 방식을 4단계에서 정한다.",
+"이 줄은 서버의 개업 절차다. 가게를 차리고, 주소를 달고, 문을 열고, 손님을 한 명씩 맞는다."]},
+p3:{t:"클라이언트 fd + 업스트림 fd",cat:"A 지도 · 프록시 서버 카드",refs:["C:352","C:380"],
+notes:["새로운 TCP 연결이 업스트림 fd가 된다.","클라이언트 → 프록시가 클라이언트 fd, 프록시 → 백엔드가 업스트림 fd다."],
+d:["“요청 하나에 fd가 두 개 묶인다는 거지?”",
+"프록시 서버는 요청 하나를 처리하는 동안 fd 두 개를 쥔다. 하나는 accept()가 준 클라이언트 fd이고, 다른 하나는 connect()로 만든 업스트림 fd다.",
+"두 fd를 한 묶음으로 관리하지 않으면 한쪽만 닫고 다른 쪽을 열어 둔다. 그렇게 남은 fd가 쌓이면 프로세스의 fd 한도를 넘겨 accept()가 실패한다.",
+"요청이 끝나거나 오류가 나면 프록시가 두 fd를 모두 닫는다.",
+"백엔드가 응답하지 않을 때 클라이언트 fd는 누가 언제 닫는가?",
+"macOS의 프로세스당 열 수 있는 fd 수는 몇 개이고, 부하 테스트에서 모자라지 않는가?",
+"프록시의 자원 관리 단위는 연결 하나가 아니라 연결 한 쌍이다.",
+"요구사항 파일 352행과 380행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서 ulimit -n 으로 현재 fd 한도를 확인한다.",
+"가운데 줄에서 화살표가 양쪽으로 나가는 이유가 이 줄이다. 프록시는 손 두 개로 양쪽을 동시에 잡고 있다."]},
+b1:{t:"백엔드 1..N · 원 서버",cat:"A 지도 · 백엔드 카드",refs:["C:351","C:380"],
+notes:["Forward Proxy에서 오른쪽 끝은 원 서버다.","Reverse Proxy에서 오른쪽 끝은 백엔드 1 .. N이다."],
+d:["“오른쪽 끝에 있는 서버가 진짜 일을 한다는 거지?”",
+"백엔드와 원 서버는 요청에 대한 실제 응답을 만드는 서버다. Reverse Proxy에서는 내부의 백엔드 여러 대이고, Forward Proxy에서는 바깥의 원 서버다.",
+"오른쪽 끝을 하나로만 생각하면 백엔드가 여러 대일 때 어느 대로 보낼지 고르는 코드가 빠진다.",
+"백엔드 주소 목록이 설정으로 주어지고 프록시가 요청마다 그중 하나를 고른다.",
+"테스트할 때 백엔드 여러 대를 무엇으로 띄우는가?",
+"백엔드 한 대가 죽었을 때 프록시는 그 사실을 언제 알아채는가?",
+"프록시는 응답 내용을 만들지 않는다. 응답을 만드는 책임은 오른쪽 끝에 있다.",
+"요구사항 파일 351행과 380행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서는 python3 -m http.server 8001 을 포트만 바꿔 여러 개 띄워 백엔드로 쓸 수 있다.",
+"오른쪽 줄은 한 대가 아니라 여러 대를 겹쳐 그린 것이다. 1..N이라는 표기가 그 뜻이다."]},
+b2:{t:"reverse: /api/* → 8001 같은 규칙",cat:"A 지도 · 백엔드 카드",refs:["C:381","C:382"],
+notes:["백엔드가 여러 대면 Round-Robin으로 돌아가며 고른다.","경로나 Host 헤더로 어느 백엔드 묶음에 보낼지 정한다."],
+d:["“경로를 보고 보낼 곳을 정하라는 거지?”",
+"Reverse Proxy는 요청의 경로나 Host 헤더를 라우팅 규칙과 비교해 백엔드를 고른다. 예를 들어 /api/ 로 시작하는 요청은 8001 포트의 백엔드로 보낸다.",
+"규칙이 없으면 모든 요청이 한 백엔드로 몰리거나, 정적 파일 요청이 API 서버로 가서 404가 난다.",
+"규칙은 설정 파일이나 실행 인자로 받고, 프록시는 요청마다 위에서부터 맞는 규칙을 찾는다.",
+"/api 와 /api/v2 처럼 규칙이 겹칠 때 어느 쪽이 이기는가?",
+"어느 규칙에도 맞지 않는 요청에는 어떤 상태 코드를 돌려주는가?",
+"클라이언트는 백엔드가 몇 대인지, 어느 포트인지 모른다. 클라이언트가 아는 주소는 프록시뿐이다.",
+"요구사항 파일 381행과 382행이 근거다. 구현 전이라 실행 테스트는 없다. 구현한 뒤 curl로 /api/x 와 /static/x 를 보내 각 백엔드의 로그에 찍히는지 확인한다.",
+"reverse라는 말은 프록시가 서버 편에 서 있다는 뜻이다. 서버들을 대표해 요청을 받아 나눠 준다."]},
+b3:{t:"forward: 요청 URL의 호스트로",cat:"A 지도 · 백엔드 카드",refs:["C:352","C:353"],
+notes:["요청 URL에서 호스트를 꺼내 그 호스트에 새 연결을 만든다.","캐싱은 선택 기능이다."],
+d:["“어디로 갈지는 요청에 적혀 있다는 거지?”",
+"Forward Proxy는 클라이언트가 보낸 요청 URL에서 호스트 이름과 포트를 꺼내고, 그 호스트에 새 TCP 연결을 만들어 요청을 대신 보낸다.",
+"호스트를 꺼내지 못하면 프록시는 연결할 상대를 모른다. 그러면 요청을 버리거나 엉뚱한 서버에 보낸다.",
+"프록시가 호스트 이름을 DNS로 IP 주소로 바꾼 뒤 connect()한다.",
+"호스트 이름을 IP 주소로 바꾸는 호출은 무엇이고, 그 호출이 오래 걸리면 다른 요청은 어떻게 되는가?",
+"클라이언트가 프록시 자신의 주소를 호스트로 적어 보내면 요청이 끝없이 돌지 않는가?",
+"Forward Proxy의 목적지는 설정이 아니라 요청마다 달라지는 값이다.",
+"요구사항 파일 352행과 353행이 근거다. 구현 전이라 실행 테스트는 없다. 구현한 뒤 curl -x http://127.0.0.1:8080 http://example.com/ 로 프록시를 거쳐 요청해 본다.",
+"forward라는 말은 프록시가 클라이언트 편에 서 있다는 뜻이다. 클라이언트를 대신해 바깥으로 나간다."]},
+n1:{t:"accept()가 연결 fd를 돌려준다",cat:"A 지도 · 프록시 안에서 일어나는 일",refs:["C:155","C:470"],
+notes:["표준 흐름의 마지막 호출이 accept()다.","대기 큐가 비어 있으면 accept()는 블로킹된다."],
+d:["“연결이 완성되면 서버가 번호표를 받는다는 거지?”",
+"프록시 서버가 accept()를 부르면 커널이 3-way handshake가 끝난 연결 하나를 대기 큐에서 꺼내 새 fd로 돌려준다.",
+"accept()를 부르지 않으면 완성된 연결이 대기 큐에 쌓이기만 한다. 큐가 차면 새 클라이언트의 연결 시도가 실패한다.",
+"accept()가 돌려준 fd는 이미 ESTABLISHED 상태라서 바로 recv()할 수 있다.",
+"대기 큐가 비어 있을 때 accept()는 무엇을 하는가?",
+"3-way handshake는 accept()가 불리기 전에 끝나는가, 불린 뒤에 시작되는가?",
+"accept()는 연결을 맺는 호출이 아니다. 커널이 이미 맺어 둔 연결을 꺼내는 호출이다.",
+"요구사항 파일 155행과 470행이 근거다. 구현 전이라 실행 테스트는 없다. 서버가 accept()를 부르지 않게 멈춰 둔 채 nc로 접속해 보면 접속이 성공하는 것으로 확인할 수 있다.",
+"① 화살표는 커널끼리 주고받는 일이고, 이 상자는 그 결과를 프로그램이 받아 드는 순간이다."]},
+n2:{t:"recv() 반복 → 빈 줄까지 파싱 → 라우팅",cat:"A 지도 · 프록시 안에서 일어나는 일",refs:["C:182","C:183","C:496"],
+notes:["요청 줄에서 메서드 · URI · 버전을 꺼낸다.","헤더에서 Host · Content-Length · Connection을 꺼낸다.","요청 줄 · 헤더 · 본문의 경계를 찾는 일이 파싱의 핵심이다."],
+d:["“한 번에 다 오지 않으니 끝이 보일 때까지 모으라는 거지?”",
+"프록시 서버는 recv()를 되풀이해 바이트를 버퍼에 모으고, 헤더의 끝을 알리는 빈 줄을 찾은 뒤 요청 줄과 헤더를 해석해 어느 처리기로 보낼지 정한다.",
+"recv() 한 번에 요청 전체가 온다고 가정하면 요청이 여러 조각으로 나뉘어 올 때 잘린 헤더를 해석해 잘못된 응답을 보낸다.",
+"파서는 빈 줄이 나올 때까지 미완성으로 보고 더 읽는다. 빈 줄이 나오면 헤더가 끝난 것으로 본다.",
+"본문이 있는 POST 요청은 빈 줄 뒤로 몇 바이트를 더 읽어야 하는가?",
+"빈 줄이 끝내 오지 않으면 버퍼는 어디까지 커지게 둘 것인가?",
+"TCP는 메시지의 경계를 지켜 주지 않는다. 경계는 HTTP 문법으로 프로그램이 직접 찾아야 한다.",
+"요구사항 파일 182행, 183행, 496행이 근거다. 구현 전이라 실행 테스트는 없다. 세부 규칙은 2단계와 3단계에서 채운다.",
+"이 상자는 받은 바이트 더미를 뜻이 있는 요청 한 개로 바꾸는 자리다."]},
+e1:{t:"① TCP 연결 맺기 (SYN · SYN-ACK · ACK)",cat:"A 지도 · 화살표",refs:["C:469","G:288"],
+notes:["3-way handshake가 요구사항의 중점 포인트로 적혀 있다.","학습 키워드의 TCP와 BSD소켓이 이 화살표에서 만난다."],
+d:["“말을 주고받기 전에 악수부터 한다는 거지?”",
+"클라이언트의 커널이 SYN을 보내고, 서버의 커널이 SYN-ACK으로 답하고, 클라이언트의 커널이 ACK을 보내면 TCP 연결이 맺어진다. 이 세 패킷은 양쪽 커널이 주고받는다.",
+"이 단계가 실패하면 HTTP 바이트는 한 개도 오가지 못한다. 서버가 listen()하지 않는 포트라면 클라이언트는 연결 거부를 받는다.",
+"세 패킷이 끝나면 서버 쪽에는 대기 큐에 완성된 연결이 하나 생긴다.",
+"프로그램은 SYN을 직접 보내지 않는다. 그렇다면 프로그램이 부르는 어떤 호출이 SYN을 보내게 만드는가?",
+"대기 큐의 길이는 누가 정하고, macOS에서 그 한도는 어디서 확인하는가?",
+"연결을 맺는 일은 커널의 일이고, 프로그램은 그 결과만 받는다.",
+"요구사항 파일 469행과 가이드 파일 288행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서 대기 큐 한도는 sysctl kern.ipc.somaxconn 으로 확인한다.",
+"① 화살표 하나는 사실 패킷 세 개다. 그림에서는 프로그램 눈높이에 맞춰 한 줄로 그렸다."]},
+e2:{t:"② HTTP 요청 (요청 줄 · 헤더 · 빈 줄 · 본문)",cat:"A 지도 · 화살표",refs:["C:182","C:183","C:184"],
+notes:["첫 줄이 요청 줄이다.","그 아래 여러 줄이 헤더다.","빈 줄 뒤가 본문이고 POST 요청에 있다."],
+d:["“요청은 네 토막으로 된 글자 덩어리라는 거지?”",
+"클라이언트가 요청 줄, 헤더 여러 줄, 빈 줄, 그리고 있으면 본문을 순서대로 이어 붙인 바이트를 연결에 써 보낸다.",
+"네 토막의 순서와 구분자를 모르면 서버는 어디까지가 헤더이고 어디부터 본문인지 알 수 없다.",
+"서버가 받은 바이트에서 메서드, URI, 버전, Host, Content-Length, Connection을 꺼낸다.",
+"줄을 나누는 글자는 정확히 무엇인가?",
+"요청 줄이 매우 길거나 헤더가 매우 많을 때 서버는 어디서 끊고 무엇을 돌려주는가?",
+"HTTP/1.1 요청은 사람이 읽을 수 있는 글자다. 그래서 nc로 손으로 쳐서 보낼 수 있다.",
+"요구사항 파일 182행, 183행, 184행이 근거다. 구현 전이라 실행 테스트는 없다. curl -v 의 > 로 시작하는 줄이 이 화살표로 나가는 바이트다.",
+"② 화살표는 편지 한 통이다. 겉봉이 요청 줄, 받는 사람 정보가 헤더, 내용물이 본문이다."]},
+e3:{t:"③ connect() · 업스트림 TCP 연결",cat:"A 지도 · 화살표",refs:["C:352","C:739"],
+notes:["새로운 TCP 연결을 만드는 호출이 connect()다.","백엔드가 응답하지 않으면 이 화살표에서 멈춘다."],
+d:["“이번에는 프록시가 손님이 되어 문을 두드린다는 거지?”",
+"프록시 서버가 고른 백엔드나 원 서버의 주소로 connect()를 불러 두 번째 TCP 연결을 맺는다.",
+"타임아웃 없이 connect()하면 죽은 백엔드를 상대로 오래 멈춘다. 그동안 클라이언트는 응답 없이 기다린다.",
+"연결에 성공하면 프록시가 업스트림 fd를 얻고, 실패하면 클라이언트에 오류 상태 코드를 돌려준다.",
+"연결에 실패했을 때와 시간이 초과됐을 때 클라이언트에 돌려줄 상태 코드는 각각 무엇인가?",
+"요청마다 새로 연결하면 비용이 얼마나 드는가? 연결을 재사용할 수 있는가?",
+"이 화살표에서 ①과 같은 3-way handshake가 한 번 더 일어난다. 이번에는 프록시가 SYN을 보내는 쪽이다.",
+"요구사항 파일 352행과 739행이 근거다. 구현 전이라 실행 테스트는 없다. 백엔드를 띄우지 않은 포트로 라우팅해 연결 거부를 일부러 만들어 확인한다.",
+"③은 ①을 거울에 비춘 것이다. 프록시가 서버 자리에서 클라이언트 자리로 옮겨 앉는다."]},
+e4:{t:"④ 고친 요청 send()",cat:"A 지도 · 화살표",refs:["C:350","C:379"],
+notes:["받은 요청을 대신 전달한다.","백엔드로 라우팅한다."],
+d:["“받은 편지를 그대로가 아니라 조금 손봐서 넘긴다는 거지?”",
+"프록시 서버가 클라이언트의 요청에서 몇몇 헤더를 고치거나 더한 뒤 업스트림 fd에 send()로 써 보낸다.",
+"헤더를 하나도 고치지 않으면 백엔드가 Host 헤더를 보고 요청을 거절하거나, 연결 유지 방식이 어긋나 응답의 끝을 찾지 못한다.",
+"프록시가 Host와 Connection 헤더를 업스트림에 맞게 정하고, 본문이 있으면 본문까지 이어서 보낸다.",
+"어느 헤더를 고치고 어느 헤더를 그대로 두어야 하는가? 7단계에서 정한다.",
+"send()가 요청한 길이보다 적게 보내고 돌아오면 남은 바이트는 누가 보내는가?",
+"프록시는 요청을 해석한 뒤 다시 글자로 조립해 보낸다. 파서와 조립기가 둘 다 필요하다.",
+"요구사항 파일 350행과 379행이 근거다. 구현 전이라 실행 테스트는 없다. 백엔드 자리에 nc -l 8001 을 띄우면 프록시가 보낸 바이트가 화면에 그대로 찍힌다.",
+"④는 ②의 사본이 아니다. 받는 사람에 맞게 겉봉을 다시 쓴 편지다."]},
+e5:{t:"⑤ 응답 recv() (상태 줄 · 헤더 · 본문)",cat:"A 지도 · 화살표",refs:["C:211","C:212","C:213"],
+notes:["응답의 첫 줄이 상태 줄이다.","Content-Length가 본문 길이를 알려 준다.","본문이 그 뒤에 온다."],
+d:["“답장도 요청과 같은 모양이라는 거지?”",
+"백엔드가 상태 줄, 헤더, 빈 줄, 본문으로 된 응답 바이트를 보내고, 프록시 서버가 업스트림 fd에서 recv()로 받는다.",
+"응답의 끝을 판단하지 못하면 프록시는 recv()에서 계속 기다린다. 클라이언트는 본문을 다 받고도 연결이 끝나지 않아 멈춘다.",
+"프록시가 Content-Length만큼 본문을 받거나, 백엔드가 연결을 닫으면 응답이 끝난 것으로 본다.",
+"응답에 Content-Length가 없으면 끝을 무엇으로 아는가?",
+"백엔드가 헤더만 보내고 멈추면 프록시는 얼마나 기다린 뒤 포기하는가?",
+"요청 파서와 응답 파서는 첫 줄만 다르고 나머지 규칙은 같다.",
+"요구사항 파일 211행, 212행, 213행이 근거다. 구현 전이라 실행 테스트는 없다. curl -v 의 < 로 시작하는 줄이 응답의 상태 줄과 헤더다.",
+"⑤는 방향만 반대인 ②다. 같은 문법의 글자가 거꾸로 흐른다."]},
+e6:{t:"⑥ 응답 중계 send() 반복",cat:"A 지도 · 화살표",refs:["C:350","C:606"],
+notes:["응답을 그대로 돌려준다.","쓰는 도중 클라이언트가 끊기면 SIGPIPE가 온다."],
+d:["“받은 답장을 손님에게 끝까지 건네라는 거지?”",
+"프록시 서버가 백엔드에서 받은 응답 바이트를 클라이언트 fd에 send()로 써 보낸다. 한 번에 다 보내지 못하면 남은 만큼 다시 보낸다.",
+"클라이언트가 이미 끊은 연결에 쓰면 커널이 SIGPIPE를 보내고, 그대로 두면 프록시 프로세스 전체가 죽는다.",
+"프록시가 SIGPIPE를 무시하게 설정해 두면 send()가 오류를 돌려주고, 프록시는 그 연결만 정리한다.",
+"macOS에서 SIGPIPE를 막는 방법은 무엇무엇이 있는가? 4단계에서 정한다.",
+"응답이 매우 클 때 전부 메모리에 모았다가 보낼 것인가, 받는 대로 흘려보낼 것인가?",
+"send()가 돌려주는 값은 보낸 바이트 수다. 요청한 길이와 같다는 보장이 없다.",
+"요구사항 파일 350행과 606행이 근거다. 구현 전이라 실행 테스트는 없다. 큰 파일을 받는 curl을 중간에 Ctrl+C로 끊고 서버가 살아 있는지 확인한다.",
+"⑥은 릴레이의 마지막 구간이다. 여기서 바통을 떨어뜨려도 다른 주자들은 계속 뛰어야 한다."]},
+e7:{t:"⑦ keep-alive면 ②로 · 아니면 close()",cat:"A 지도 · 화살표",refs:["C:498","C:740"],
+notes:["Connection: keep-alive의 의미와 처리가 중점 포인트다.","클라이언트가 갑자기 끊는 경우도 이 화살표에서 다룬다."],
+d:["“한 번 쓴 연결을 또 쓸지 여기서 정한다는 거지?”",
+"응답을 다 보낸 뒤 프록시 서버는 연결을 유지할지 닫을지 정한다. 유지하면 같은 연결에서 다음 요청을 기다리고, 닫으면 close()를 부른다.",
+"언제나 유지하면 말없이 떠난 클라이언트의 연결이 계속 쌓인다. 언제나 닫으면 요청마다 3-way handshake를 다시 한다.",
+"프록시가 Connection 헤더와 HTTP 버전을 보고 정하고, 유지하는 연결에는 대기 시간 한도를 건다.",
+"HTTP/1.1과 HTTP/1.0은 Connection 헤더가 없을 때 기본값이 각각 무엇인가?",
+"유지 중인 연결에서 클라이언트가 말없이 끊으면 서버는 무엇으로 알아채는가?",
+"연결의 수명과 요청의 수명은 다르다. 연결 하나에 요청 여러 개가 차례로 지나갈 수 있다.",
+"요구사항 파일 498행과 740행이 근거다. 구현 전이라 실행 테스트는 없다. curl -v 로 URL 두 개를 한 번에 주면 연결을 다시 썼는지 출력에 나온다.",
+"⑦이 양쪽 화살표인 이유는 닫기를 어느 쪽이 먼저 할지 정해져 있지 않기 때문이다. 그 두 길이 B 지도다."]},
+s1:{t:"CLOSED (시작)",cat:"B 지도 · 상태 · 연결 맺기",refs:["C:155","C:469"],
+notes:["socket()이 이 상태의 소켓을 만든다.","SO_REUSEADDR는 이 상태에서 bind() 전에 건다."],
+d:["“만들기만 하고 아직 아무것도 안 한 소켓이라는 거지?”",
+"프록시 서버가 socket()을 부르면 커널이 소켓을 만들고 fd를 돌려준다. 이 소켓은 아직 주소도 상대도 없는 CLOSED 상태다.",
+"이 상태에서 걸어야 하는 옵션을 놓치면 뒤에서 고칠 수 없다. 주소 재사용 옵션은 bind() 전에 걸어야 한다.",
+"프록시가 이 상태에서 옵션을 걸고 bind()와 listen()을 부르면 LISTEN으로 넘어간다.",
+"IPv4 소켓과 IPv6 소켓 중 무엇을 만들 것인가?",
+"socket()이 실패하는 경우는 무엇이 있는가?",
+"fd는 커널 안 소켓을 가리키는 번호표일 뿐이다. 번호표를 받았다고 통신이 시작된 것은 아니다.",
+"요구사항 파일 155행과 469행이 근거다. 구현 전이라 실행 테스트는 없다. 이 상태의 소켓은 주소가 없어 netstat 목록에 나오지 않는다.",
+"전화기를 샀지만 번호를 받지 않은 상태와 같다."]},
+s2:{t:"LISTEN",cat:"B 지도 · 상태 · 연결 맺기",refs:["C:155","C:470"],
+notes:["bind()와 listen()이 성공하면 이 상태가 된다.","bind 실패가 나면 이 상태에 오지 못한다."],
+d:["“문을 열고 손님을 기다리는 상태라는 거지?”",
+"프록시 서버가 bind()로 포트를 붙이고 listen()을 부르면 커널이 그 소켓을 LISTEN 상태로 바꾸고, 그 포트로 오는 SYN을 받기 시작한다.",
+"bind()가 실패한 것을 확인하지 않고 넘어가면 서버는 떠 있는 것처럼 보이지만 어떤 연결도 받지 못한다.",
+"서버가 떠 있는 동안 이 소켓은 계속 LISTEN에 머문다. 연결이 맺어져도 이 소켓의 상태는 바뀌지 않는다.",
+"같은 포트로 서버를 두 번 띄우면 둘째 서버의 bind()는 어떤 오류를 내는가?",
+"listen()의 둘째 인자 backlog에는 얼마를 넣어야 하는가?",
+"듣는 소켓은 데이터를 주고받지 않는다. 연결 소켓을 만들어 내는 일만 한다.",
+"요구사항 파일 155행과 470행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서 lsof -nP -iTCP:8080 -sTCP:LISTEN 으로 이 상태의 소켓과 프로세스를 본다.",
+"가게 문에 영업 중 팻말을 건 상태다. 팻말은 손님이 들어와도 그대로 걸려 있다."]},
+s3:{t:"SYN_RCVD",cat:"B 지도 · 상태 · 연결 맺기",refs:["C:469"],
+notes:["3-way handshake의 가운데 단계가 이 상태다."],
+d:["“악수의 절반만 끝난 상태라는 거지?”",
+"클라이언트의 SYN이 도착하면 서버의 커널이 새 연결용 소켓을 만들고 SYN-ACK을 보낸 뒤, 마지막 ACK이 오기를 기다린다. 이 대기 상태가 SYN_RCVD다.",
+"SYN만 보내고 ACK을 보내지 않는 연결 시도가 몰리면 이 상태의 연결이 대기 자리를 채워, 정상 클라이언트의 연결이 늦어지거나 실패한다.",
+"마지막 ACK이 도착하면 커널이 이 연결을 ESTABLISHED로 바꾸고 accept() 대기 큐에 넣는다.",
+"이 상태를 프로그램에서 볼 방법이 있는가?",
+"마지막 ACK이 끝내 오지 않으면 커널은 이 연결을 언제 버리는가?",
+"이 상태는 커널 안에서만 지나간다. 프로그램은 이 상태를 한 번도 만나지 않는다.",
+"요구사항 파일 469행이 근거다. 구현 전이라 실행 테스트는 없다. 로컬에서는 매우 짧게 지나가서 netstat으로 보기 어렵다.",
+"손을 내밀었고 상대가 잡기를 기다리는 한순간이다."]},
+s4:{t:"ESTABLISHED",cat:"B 지도 · 상태 · 데이터 주고받기",refs:["C:156","C:498"],
+notes:["요청과 응답의 송수신이 이 상태에서 일어난다.","keep-alive면 이 상태에 오래 머문다."],
+d:["“이제부터 진짜 대화가 오간다는 거지?”",
+"3-way handshake가 끝난 연결은 ESTABLISHED 상태다. 프록시 서버가 accept()로 이 연결의 fd를 받아 recv()와 send()로 HTTP 바이트를 주고받는다.",
+"이 상태에 머무는 시간에 한도를 두지 않으면 아무 말도 하지 않는 연결이 자리를 차지해 새 연결을 받지 못한다.",
+"A 지도의 ②부터 ⑥까지가 모두 이 상태 안에서 일어난다.",
+"이 상태 안에서 프로그램이 따로 관리해야 하는 단계는 무엇인가? 2단계에서 그린다.",
+"연결이 유지되는 동안 상대가 살아 있는지 무엇으로 알 수 있는가?",
+"TCP에게는 이 상태 하나뿐이지만 HTTP 서버에게는 읽는 중, 처리 중, 쓰는 중이라는 단계가 더 있다.",
+"요구사항 파일 156행과 498행이 근거다. 구현 전이라 실행 테스트는 없다. curl이 붙어 있는 동안 netstat -an -p tcp | grep 8080 에 ESTABLISHED 줄이 보인다.",
+"통화가 연결된 상태다. 무슨 말을 어떤 순서로 할지는 전화기가 아니라 통화하는 사람이 정한다."]},
+s5:{t:"FIN_WAIT_1",cat:"B 지도 · 상태 · 서버가 먼저 닫음",refs:["C:498","C:605"],
+notes:["keep-alive가 아니면 서버가 응답 뒤에 먼저 닫는다.","종료 신호를 받은 서버도 연결을 먼저 닫는다."],
+d:["“서버가 먼저 끊겠다고 말한 상태라는 거지?”",
+"프록시 서버가 close()를 먼저 부르면 커널이 FIN을 보내고, 그 FIN에 대한 ACK을 기다리는 FIN_WAIT_1 상태가 된다.",
+"보낼 응답이 송신 버퍼에 남은 채 프로세스가 끝나 버리면 클라이언트가 응답의 뒷부분을 받지 못한다.",
+"커널은 송신 버퍼에 남은 바이트를 먼저 보낸 뒤 FIN을 보낸다.",
+"close() 대신 shutdown()을 쓰면 무엇이 달라지는가? 4단계에서 정한다.",
+"상대가 FIN의 ACK을 끝내 보내지 않으면 이 상태는 언제 끝나는가?",
+"먼저 닫는 쪽이 왼쪽 길을 걷는다. 이 길의 끝에는 TIME_WAIT이 있다.",
+"요구사항 파일 498행과 605행이 근거다. 구현 전이라 실행 테스트는 없다. 로컬에서는 짧게 지나가서 netstat으로 보기 어렵다.",
+"전화에서 먼저 끊겠다고 말하고 상대의 대답을 기다리는 순간이다."]},
+s6:{t:"FIN_WAIT_2",cat:"B 지도 · 상태 · 서버가 먼저 닫음",refs:["C:605"],
+notes:["안전한 셧다운은 상대의 FIN까지 기다리는 과정을 포함한다."],
+d:["“내 쪽은 끝났고 상대가 끝내기를 기다린다는 거지?”",
+"서버가 보낸 FIN의 ACK이 도착하면 FIN_WAIT_2 상태가 된다. 서버 쪽 송신은 끝났고, 클라이언트가 자기 FIN을 보내기를 기다린다.",
+"클라이언트가 FIN을 보내지 않고 사라지면 이 상태의 소켓이 남는다. 커널에 대기 시간 한도가 없다면 계속 남는다.",
+"클라이언트의 FIN이 도착하면 커널이 ACK을 보내고 TIME_WAIT으로 넘어간다.",
+"이 상태에서 클라이언트가 보내는 데이터를 서버가 받을 수 있는가?",
+"이 상태의 대기 시간 한도는 운영체제마다 다른가?",
+"TCP 연결은 방향마다 따로 닫힌다. 한 방향을 닫아도 반대 방향은 아직 열려 있다.",
+"요구사항 파일 605행이 근거다. 구현 전이라 실행 테스트는 없다. 클라이언트를 일시 정지시켜 두고 서버가 먼저 닫으면 netstat에서 이 상태를 볼 수 있다.",
+"나는 할 말을 다 했고 상대의 마지막 인사를 듣고 있는 상태다."]},
+s7:{t:"TIME_WAIT",cat:"B 지도 · 상태 · 서버가 먼저 닫음",refs:["C:469","C:470"],
+notes:["SO_REUSEADDR가 필요한 이유가 이 상태다.","서버를 다시 띄울 때 bind 실패가 나는 원인이 이 상태다."],
+d:["“다 끊고도 잠깐 자리를 비워 두는 상태라는 거지?”",
+"먼저 닫은 쪽의 커널은 마지막 ACK을 보낸 뒤 MSL의 2배 시간 동안 그 연결의 주소와 포트 쌍을 TIME_WAIT 상태로 잡아 둔다. 늦게 도착한 패킷이 새 연결에 섞이지 않게 하려는 것이다.",
+"서버가 먼저 닫은 연결이 이 상태로 남아 있을 때 서버를 다시 띄우면 bind()가 주소 사용 중 오류로 실패한다.",
+"프록시가 듣는 소켓에 SO_REUSEADDR를 걸어 두면 이 상태의 연결이 남아 있어도 bind()가 성공한다.",
+"macOS에서 MSL은 몇 초로 설정되어 있는가?",
+"SO_REUSEADDR를 걸면 떠 있는 서버 두 개가 같은 포트를 함께 쓸 수 있게 되는가?",
+"TIME_WAIT은 고쳐야 할 오류가 아니라 TCP가 일부러 두는 안전 시간이다.",
+"요구사항 파일 469행과 470행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서 MSL 값은 sysctl net.inet.tcp.msl 로 확인하고, 이 상태의 줄은 netstat -an -p tcp 에 TIME_WAIT으로 보인다.",
+"통화를 끝낸 뒤에도 그 번호를 잠깐 다른 사람에게 주지 않는 것과 같다."]},
+s8:{t:"CLOSE_WAIT",cat:"B 지도 · 상태 · 클라이언트가 먼저 닫음",refs:["C:740","C:606"],
+notes:["클라이언트의 갑작스러운 종료가 이 상태를 만든다.","이 상태의 소켓에 쓰면 SIGPIPE가 올 수 있다."],
+d:["“상대는 끊었는데 내가 아직 안 끊은 상태라는 거지?”",
+"클라이언트의 FIN이 도착하면 서버의 커널이 ACK을 보내고 그 연결을 CLOSE_WAIT 상태로 둔다. 이때 서버가 recv()를 부르면 0이 돌아온다.",
+"recv()가 0을 돌려줬는데 서버가 close()를 부르지 않으면 이 상태의 소켓이 계속 쌓인다. 쌓인 fd가 한도에 닿으면 accept()가 실패한다.",
+"프록시는 recv()가 0을 돌려주면 그 연결과 짝인 업스트림 연결을 정리하고 close()를 부른다.",
+"recv()의 반환값 0과 -1은 각각 무슨 뜻인가?",
+"상대가 FIN이 아니라 RST로 끊으면 recv()는 무엇을 돌려주는가?",
+"이 상태에서 벗어나게 하는 것은 커널이 아니라 프로그램이다. 서버 버그가 그대로 드러나는 상태다.",
+"요구사항 파일 740행과 606행이 근거다. 구현 전이라 실행 테스트는 없다. 오래 켜 둔 서버에서 netstat -an -p tcp | grep CLOSE_WAIT 의 줄 수가 늘어나는지 본다.",
+"상대가 전화를 끊었는데 나는 수화기를 든 채로 있는 상태다."]},
+s9:{t:"LAST_ACK",cat:"B 지도 · 상태 · 클라이언트가 먼저 닫음",refs:["C:740"],
+notes:["클라이언트가 먼저 닫은 연결의 마지막 단계다."],
+d:["“나도 끊겠다고 말하고 마지막 대답만 기다린다는 거지?”",
+"CLOSE_WAIT 상태에서 서버가 close()를 부르면 커널이 FIN을 보내고, 그 FIN의 ACK을 기다리는 LAST_ACK 상태가 된다.",
+"이 상태가 길어지는 것은 상대가 이미 사라져 ACK을 보내지 못하는 경우다. 프로그램이 할 수 있는 일은 없고 커널이 재전송 뒤 정리한다.",
+"ACK이 도착하면 커널이 소켓을 없애고 CLOSED가 된다.",
+"이 길에는 왜 TIME_WAIT이 없는가?",
+"close()가 반환된 뒤에도 커널이 FIN을 다시 보내는 일이 있는가?",
+"나중에 닫는 쪽은 TIME_WAIT을 거치지 않는다. 그 부담은 먼저 닫은 쪽이 진다.",
+"요구사항 파일 740행이 근거다. 구현 전이라 실행 테스트는 없다. 로컬에서는 짧게 지나가서 netstat으로 보기 어렵다.",
+"수화기를 내려놓았고 딸깍 소리가 나기 직전이다."]},
+s10:{t:"CLOSED (끝)",cat:"B 지도 · 상태 · 끝",refs:["C:605","G:838"],
+notes:["안전한 셧다운의 목표는 모든 소켓이 이 상태에 이르는 것이다.","연결 하나의 일생을 끝까지 따라가 보는 것이 네트워크 동작을 이해하는 방법이다."],
+d:["“번호표를 반납하고 완전히 끝난 상태라는 거지?”",
+"두 방향의 FIN과 ACK이 모두 오가면 커널이 그 연결의 소켓을 없앤다. fd 번호는 프로세스가 다시 쓸 수 있게 된다.",
+"프로그램이 close()를 빠뜨리면 연결은 이 상태에 오지 못하고, fd가 하나씩 새어 나간다.",
+"요청 하나가 끝나면 그 요청이 쓴 fd 수만큼 프로세스의 fd 수가 다시 줄어든다.",
+"닫은 fd 번호를 다른 스레드가 바로 받아 갔을 때 옛 번호로 쓰면 무슨 일이 생기는가?",
+"서버를 종료할 때 듣는 소켓과 연결 소켓 중 무엇을 먼저 닫아야 하는가?",
+"시작과 끝이 같은 이름인 CLOSED다. 연결의 일생은 CLOSED에서 나와 CLOSED로 돌아오는 한 바퀴다.",
+"요구사항 파일 605행과 가이드 파일 838행이 근거다. 구현 전이라 실행 테스트는 없다. macOS에서 lsof -p <pid> | wc -l 을 요청 전후로 비교해 fd가 새지 않는지 본다.",
+"통화 기록만 남고 회선은 비워진 상태다."]}
+};
+
+const ORDER=["c1","c2","c3","p1","p2","p3","b1","b2","b3","n1","n2","e1","e2","e3","e4","e5","e6","e7","s1","s2","s3","s4","s5","s6","s7","s8","s9","s10"];
+const back=document.getElementById("backdrop"),tip=document.getElementById("tooltip");
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function openRec(id){const r=REC[id];if(!r)return;const n=ORDER.indexOf(id)+1;
+document.getElementById("ttTitle").textContent="항목 "+n+" · "+r.t;
+document.getElementById("ttCat").textContent=r.cat;
+document.getElementById("ttIcon").textContent=id.charAt(0).toUpperCase();
+const files=[...new Set(r.refs.map(x=>x.split(":")[0]))];
+document.getElementById("ttFile").textContent=files.map(k=>FILES[k]).join(" / ");
+document.getElementById("ttLines").textContent=r.refs.map(x=>(x.charAt(0)==="C"?"요구사항 ":"가이드 ")+x.split(":")[1]+"행").join(" · ");
+const a=document.getElementById("ttAnalysis");a.replaceChildren();
+const first=el("div","analysis-item");first.append(el("h3","","원문"),el("p","",r.t));a.append(first);
+r.d.forEach((txt,i)=>{const it=el("div","analysis-item");it.append(el("h3","",LABELS[i]),el("p","",txt));a.append(it)});
+const host=document.getElementById("ttCode");host.replaceChildren();let cur=null;
+r.refs.forEach((ref,i)=>{const k=ref.split(":")[0],ln=ref.split(":")[1];if(k!==cur){cur=k;host.append(el("div","code-file",FILES[k]))}
+const row=el("div","code-row"),src=el("div","code-source");src.append(el("span","code-number",ln),el("pre","",EV[ref]));row.append(src,el("div","code-note",r.notes[i]));host.append(row)});
+tip.scrollTop=0;tip.classList.add("show");back.classList.add("show")}
+function closeTip(){tip.classList.remove("show");back.classList.remove("show")}
+back.addEventListener("click",closeTip);document.getElementById("ttClose").addEventListener("click",closeTip);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeTip()});
+document.querySelectorAll("[data-rec]").forEach(g=>{const id=g.dataset.rec;g.setAttribute("tabindex","0");g.setAttribute("role","button");g.setAttribute("aria-label",REC[id].t+" 상세 정보. 눌러서 가운데 창에서 확인");
+g.addEventListener("click",e=>{e.stopPropagation();openRec(id)});
+g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openRec(id)}})});
+
+const SCEN={
+reverse:{color:"#67e8f9",steps:[
+["e1","커널 · 3-way handshake","클라이언트의 커널과 프록시의 커널이 패킷 세 개로 TCP 연결을 맺습니다."],
+["n1","accept()","프록시 서버가 완성된 연결을 대기 큐에서 꺼내 클라이언트 fd를 받습니다."],
+["e2","recv()","클라이언트가 보낸 HTTP 요청 바이트가 프록시 서버에 도착합니다."],
+["n2","파서 · 라우터","프록시 서버가 빈 줄까지 모아 해석하고, 경로를 라우팅 규칙과 비교해 백엔드를 고릅니다."],
+["e3","connect()","프록시 서버가 고른 백엔드에 두 번째 TCP 연결을 맺습니다."],
+["e4","send()","프록시 서버가 헤더를 고친 요청을 백엔드에 보냅니다."],
+["e5","recv()","백엔드가 만든 응답을 프록시 서버가 받습니다."],
+["e6","send()","프록시 서버가 응답을 클라이언트에 그대로 넘깁니다."],
+["e7","close() 또는 다음 recv()","프록시 서버가 연결을 유지할지 닫을지 정합니다."]]},
+forward:{color:"#fbbf24",steps:[
+["e1","커널 · 3-way handshake","클라이언트가 프록시 주소로 TCP 연결을 맺습니다. 클라이언트는 프록시를 쓰도록 설정되어 있습니다."],
+["n1","accept()","프록시 서버가 클라이언트 fd를 받습니다."],
+["e2","recv()","클라이언트가 원 서버의 전체 URL이 적힌 요청을 프록시에 보냅니다."],
+["n2","파서 · 호스트 추출","프록시 서버가 요청 URL에서 원 서버의 호스트 이름과 포트를 꺼냅니다."],
+["e3","connect()","프록시 서버가 호스트 이름을 IP 주소로 바꾼 뒤 원 서버에 TCP 연결을 맺습니다."],
+["e4","send()","프록시 서버가 클라이언트 대신 원 서버에 요청을 보냅니다."],
+["e5","recv()","원 서버의 응답을 프록시 서버가 받습니다."],
+["e6","send()","프록시 서버가 응답을 클라이언트에 그대로 돌려줍니다."],
+["e7","close() 또는 다음 recv()","프록시 서버가 두 연결을 정리하거나 다음 요청을 기다립니다."]]},
+"server-first":{color:"#fb923c",steps:[
+["s1","socket()","프록시 서버가 소켓을 만듭니다."],
+["s2","bind() · listen()","프록시 서버가 포트를 붙이고 연결 요청을 받기 시작합니다."],
+["s3","커널","클라이언트의 SYN이 도착해 커널이 SYN-ACK을 보냅니다."],
+["s4","accept() · recv() · send()","연결이 완성되어 프록시 서버가 요청을 받고 응답을 보냅니다."],
+["s5","close()","프록시 서버가 응답을 다 보내고 먼저 닫습니다. 커널이 FIN을 보냅니다."],
+["s6","커널","서버가 보낸 FIN의 ACK이 도착했습니다. 클라이언트의 FIN을 기다립니다."],
+["s7","커널","클라이언트의 FIN에 ACK을 보내고 MSL의 2배 시간 동안 기다립니다."],
+["s10","커널","대기 시간이 지나 커널이 소켓을 없앱니다."]]},
+"client-first":{color:"#f472b6",steps:[
+["s1","socket()","프록시 서버가 소켓을 만듭니다."],
+["s2","bind() · listen()","프록시 서버가 포트를 붙이고 연결 요청을 받기 시작합니다."],
+["s3","커널","클라이언트의 SYN이 도착해 커널이 SYN-ACK을 보냅니다."],
+["s4","accept() · recv() · send()","연결이 완성되어 프록시 서버가 요청을 받고 응답을 보냅니다."],
+["s8","recv()가 0 반환","클라이언트가 먼저 닫아 FIN이 도착했습니다. 프록시 서버의 recv()가 0을 돌려줍니다."],
+["s9","close()","프록시 서버가 close()를 불러 커널이 FIN을 보냅니다."],
+["s10","커널","마지막 ACK이 도착해 커널이 소켓을 없앱니다."]]}};
+function makeStepper(sfx){const sel=document.getElementById("scenario"+sfx);let i=0;
+function show(){const sc=SCEN[sel.value],st=sc.steps[i];
+sel.closest(".stackmap").querySelectorAll(".active").forEach(x=>x.classList.remove("active"));
+const target=sel.closest(".stackmap").querySelector('[data-rec="'+st[0]+'"]');
+if(target){target.classList.add("active");target.style.setProperty("--active-color",sc.color)}
+document.getElementById("fn"+sfx).textContent=st[1];document.getElementById("text"+sfx).textContent=st[2];
+document.getElementById("count"+sfx).textContent=(i+1)+" / "+sc.steps.length}
+sel.addEventListener("change",()=>{i=0;show()});
+function prev(){const n=SCEN[sel.value].steps.length;i=(i-1+n)%n;show()}
+function next(){i=(i+1)%SCEN[sel.value].steps.length;show()}
+document.getElementById("prev"+sfx).addEventListener("click",prev);
+document.getElementById("next"+sfx).addEventListener("click",next);show();
+return {prev,next,section:sel.closest(".stackmap")}}
+const STEPPERS=[makeStepper("A"),makeStepper("B")];
+function keyTarget(){const mid=window.innerHeight/2;let best=STEPPERS[0],bestDist=Infinity;
+for(const s of STEPPERS){const r=s.section.getBoundingClientRect();const d=r.top<=mid&&r.bottom>=mid?0:Math.min(Math.abs(r.top-mid),Math.abs(r.bottom-mid));if(d<bestDist){bestDist=d;best=s}}return best}
+function markKeyTarget(){const t=keyTarget();STEPPERS.forEach(s=>s.section.classList.toggle("kbd",s===t))}
+window.addEventListener("scroll",markKeyTarget,{passive:true});window.addEventListener("resize",markKeyTarget);markKeyTarget();
+document.addEventListener("keydown",e=>{if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;
+if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
+if(tip.classList.contains("show"))return;
+const tag=e.target&&e.target.tagName;if(tag==="SELECT"||tag==="INPUT"||tag==="TEXTAREA")return;
+e.preventDefault();const t=keyTarget();e.key==="ArrowLeft"?t.prev():t.next()});
+function toggleTheme(){const e=document.documentElement;e.getAttribute("data-theme")==="light"?e.removeAttribute("data-theme"):e.setAttribute("data-theme","light")}
+</script>
+</body>
+</html>
