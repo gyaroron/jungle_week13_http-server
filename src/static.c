@@ -129,7 +129,7 @@ int static_serve_cached(int fd, const struct config *cfg,
     }
     if (capture != NULL) {
         // 파일 경로와 이 시점의 파일 정보를 저장해 다음 HIT 때 원본 변경을 검사합니다.
-        (void)cache_capture_set_file_source(capture, file_path, &file_stat);
+        (void)cache_capture_set_file_source(capture, candidate, &file_stat);
     }
 
     char response_head[1024];
