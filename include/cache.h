@@ -2,6 +2,7 @@
 #define CACHE_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include "http.h"
 
 #define CACHE_KEY_MAX 2048
@@ -24,6 +25,8 @@ struct cache_capture {
     size_t header_length;
     size_t expected_length;
     size_t body_length;
+    size_t ttl_seconds;
+    uint64_t generation;
 };
 
 /* Make an absolute-URL cache key. Return 1 when cacheable, 0 when bypassed. */
@@ -40,6 +43,10 @@ int cache_capture_write(struct cache_capture *capture,
                         const void *data, size_t length);
 int cache_capture_finish(struct cache_capture *capture);
 void cache_capture_abort(struct cache_capture *capture);
+/* GET은 공유 읽기 잠금, 다른 메서드는 단독 변경 잠금을 잡습니다. */
+int cache_request_lock(int is_write);
+int cache_request_unlock(void);
+void cache_invalidate_all(void);
 void cache_destroy(void);
 
 #endif

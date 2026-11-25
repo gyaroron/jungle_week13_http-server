@@ -241,6 +241,16 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 req.keep_alive = c.keep_alive;
                 int serve_result = 0;
                 int proxy_handled = 0;
+                int invalidates_cache = strcmp(req.method, "GET") != 0;
+                if (cache_request_lock(invalidates_cache) < 0) {
+                    server_log_errno("cache request lock", errno);
+                    conn_set_state(&c, CONN_CLOSING);
+                    break;
+                }
+                if (invalidates_cache) {
+                    // 쓰기 잠금 안에서 기존 응답을 지워 이후 읽기가 원본을 확인하게 합니다.
+                    cache_invalidate_all();
+                }
                 struct cache_capture capture;
                 struct cache_capture *capture_ptr = NULL;
                 char cache_key[CACHE_KEY_MAX];
@@ -248,12 +258,14 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     cache_key_for_request(&req, cache_key, sizeof(cache_key))) {
                     int cache_result = cache_lookup_send(c.fd, cache_key);
                     if (cache_result < 0) {
+                        cache_request_unlock();
                         conn_set_state(&c, CONN_CLOSING);
                         break;
                     }
                     if (cache_result > 0) {
                         c.response_sent = 1;
                         c.keep_alive = 0;
+                        cache_request_unlock();
                         conn_set_state(&c, CONN_RESPONDING);
                         break;
                     }
@@ -287,8 +299,13 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                         proxy_handled = 1;
                     }
                 }
+                if (invalidates_cache) {
+                    // 변경 응답을 마친 뒤 다시 비워 변경 중 생성된 항목도 제거합니다.
+                    cache_invalidate_all();
+                }
                 if (serve_result < 0) {
                     cache_capture_abort(capture_ptr);
+                    cache_request_unlock();
                     if (errno != EPIPE && errno != ECONNRESET) {
                         server_log_errno("static_serve", errno);
                     }
@@ -296,6 +313,12 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     break;
                 }
                 if (capture_ptr != NULL && cache_capture_finish(capture_ptr) < 0) {
+                    cache_request_unlock();
+                    conn_set_state(&c, CONN_CLOSING);
+                    break;
+                }
+                if (cache_request_unlock() < 0) {
+                    server_log_errno("cache request unlock", errno);
                     conn_set_state(&c, CONN_CLOSING);
                     break;
                 }
