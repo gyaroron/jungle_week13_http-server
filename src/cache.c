@@ -266,13 +266,23 @@ int cache_capture_write(struct cache_capture *capture,
                         const void *data, size_t length) {
     if (capture == NULL || data == NULL || length == 0) return 0;
     const unsigned char *bytes = data;
+    if (capture->disabled) {
+        return net_send_all(capture->client_fd, bytes, length);
+    }
     if (!capture->header_sent) {
         if (append_bytes(&capture->pending, &capture->pending_len,
                          &capture->pending_cap, bytes, length,
                          CACHE_HEADER_MAX) < 0) {
+            if (capture->pending_len > 0 &&
+                net_send_all(capture->client_fd, capture->pending,
+                             capture->pending_len) < 0) return -1;
+            if (net_send_all(capture->client_fd, bytes, length) < 0) return -1;
             capture->disabled = 1;
-            errno = EMSGSIZE;
-            return -1;
+            capture->header_sent = 1;
+            free(capture->pending);
+            capture->pending = NULL;
+            capture->pending_len = capture->pending_cap = 0;
+            return 0;
         }
         size_t end;
         if (!header_end(capture->pending, capture->pending_len, &end)) return 0;
@@ -288,8 +298,14 @@ int cache_capture_write(struct cache_capture *capture,
                                       capture->status == 200;
         if (parsed != 1) {
             free(header);
+            if (net_send_all(capture->client_fd, capture->pending,
+                             capture->pending_len) < 0) return -1;
             capture->disabled = 1;
-            return -1;
+            capture->header_sent = 1;
+            free(capture->pending);
+            capture->pending = NULL;
+            capture->pending_len = capture->pending_cap = 0;
+            return 0;
         }
         if (net_send_all(capture->client_fd, header, transformed_len) < 0) {
             free(header);
@@ -340,6 +356,7 @@ int cache_capture_finish(struct cache_capture *capture) {
             memcpy(entry->key, capture->key, strlen(capture->key) + 1);
             memcpy(saved, capture->response, capture->response_len);
             entry->response = saved;
+            saved = NULL;
             entry->length = capture->response_len;
             pthread_mutex_lock(&cache_mutex);
             struct cache_entry **link = &cache_head;
@@ -377,10 +394,8 @@ int cache_capture_finish(struct cache_capture *capture) {
         if (entry != NULL) {
             free(entry->response);
             free(entry);
-            free(saved);
-        } else {
-            // Cache가 entry를 소유하므로 저장된 응답 버퍼는 여기서 해제하지 않습니다.
         }
+        free(saved);
     }
     cache_capture_abort(capture);
     return 0;
