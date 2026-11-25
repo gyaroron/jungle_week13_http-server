@@ -55,9 +55,10 @@ int cache_capture_write(struct cache_capture *capture,
                         const void *data, size_t length);
 int cache_capture_finish(struct cache_capture *capture);
 void cache_capture_abort(struct cache_capture *capture);
-/* GET은 공유 읽기 잠금, 다른 메서드는 단독 변경 잠금을 잡습니다. */
-int cache_request_lock(int is_write);
-int cache_request_unlock(void);
+/* 비-GET 요청의 앞뒤에서 부릅니다. 사이 구간에는 GET이 캐시를 건너뜁니다.
+ * 잠금을 요청 처리 시간 동안 잡지 않으므로 느린 클라이언트가 다른 요청을 막지 않습니다. */
+void cache_write_begin(void);
+void cache_write_end(void);
 void cache_invalidate_all(void);
 void cache_destroy(void);
 

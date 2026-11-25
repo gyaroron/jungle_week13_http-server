@@ -211,6 +211,78 @@ status=$(status_for "http://127.0.0.1:$SERVER_PORT/")
 [[ "$status" == 200 ]] && pass '큰 파일 수신 중 클라이언트 종료 뒤 서버 생존' || \
     fail "큰 파일 수신 중 클라이언트 종료 뒤 서버 생존 (status=$status)"
 
+# 헤더를 조금씩 보내는 연결도 요청 전체 제한 시간(-t 2) 안에 408로 끊겨야 합니다.
+# recv() 한 번마다 제한 시간이 새로 시작되면 이 연결이 일꾼을 무기한 붙잡습니다.
+slow_header=$(python3 - "$SERVER_PORT" <<'PY'
+import socket, sys, time
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])))
+s.sendall(b"GET / HTTP/1.1\r\n")
+s.settimeout(0.5)
+start = time.time()
+while time.time() - start < 6:
+    try:
+        data = s.recv(64)
+        if data:
+            print(f"{data.split(b' ')[1].decode()} {time.time() - start:.1f}")
+            break
+    except socket.timeout:
+        pass
+    try:
+        s.sendall(b"X-a: b\r\n")
+    except OSError:
+        print(f"closed {time.time() - start:.1f}")
+        break
+else:
+    print("none 6.0")
+PY
+)
+read -r slow_status slow_seconds <<< "$slow_header"
+if [[ "$slow_status" == 408 ]] && awk "BEGIN { exit !($slow_seconds < 4) }"; then
+    pass '헤더를 조금씩 보내는 연결은 제한 시간 뒤 408'
+else fail "헤더를 조금씩 보내는 연결은 제한 시간 뒤 408 (결과=$slow_header)"; fi
+
+# 큰 파일을 아주 느리게 받는 GET이 있어도 POST와 다른 GET이 기다리지 않아야 합니다.
+# 캐시 잠금을 응답 전송 동안 잡으면 대기 중인 POST가 이후 GET 전체를 막습니다.
+slow_reader=$(python3 - "$SERVER_PORT" <<'PY'
+import socket, sys, threading, time
+port = int(sys.argv[1])
+slow = socket.socket()
+slow.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+slow.connect(("127.0.0.1", port))
+slow.sendall(b"GET /large-test.bin HTTP/1.1\r\nHost: t\r\n\r\n")
+stop = threading.Event()
+def trickle():
+    while not stop.is_set():
+        try:
+            slow.recv(1024)
+        except OSError:
+            return
+        time.sleep(0.5)
+threading.Thread(target=trickle, daemon=True).start()
+time.sleep(1.0)
+def ask(raw):
+    t = time.time()
+    try:
+        c = socket.create_connection(("127.0.0.1", port), timeout=3)
+        c.settimeout(3)
+        c.sendall(raw)
+        line = c.recv(64).split(b"\r\n", 1)[0].decode()
+        c.close()
+        return line.split(" ")[1], time.time() - t
+    except OSError:
+        return "timeout", time.time() - t
+post = ask(b"POST /cgi-bin/echo.sh HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi")
+get = ask(b"GET / HTTP/1.1\r\nHost: t\r\nConnection: close\r\n\r\n")
+stop.set()
+slow.close()
+print(f"{post[0]} {get[0]} {max(post[1], get[1]):.1f}")
+PY
+)
+read -r reader_post reader_get reader_seconds <<< "$slow_reader"
+if [[ "$reader_post" == 200 && "$reader_get" == 200 ]] && awk "BEGIN { exit !($reader_seconds < 1) }"; then
+    pass '느린 GET 다운로드 중에도 POST와 GET 즉시 처리'
+else fail "느린 GET 다운로드 중에도 POST와 GET 즉시 처리 (결과=$slow_reader)"; fi
+
 status=$(status_for "http://127.0.0.1:$SERVER_PORT/")
 [[ "$status" == 200 ]] && pass '극한 요청 뒤 서버 생존' || fail "극한 요청 뒤 서버 생존 (status=$status)"
 

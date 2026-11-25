@@ -9,10 +9,13 @@
 #include "static.h"
 
 #include <errno.h>
+#include <limits.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 // 이 값들은 TCP 상태가 아니라 서버 프로그램이 관리하는 처리 단계입니다.
@@ -37,7 +40,33 @@ struct conn {
     int response_sent;
     char *body;
     size_t body_len;
+    // 요청 하나(헤더와 본문)를 다 받아야 하는 단조 시계 기준 마감 시각입니다.
+    // recv() 한 번마다 늘어나는 소켓 제한 시간과 달리, 조금씩 보내는 연결도 이 시각에 끊깁니다.
+    long long deadline_ms;
+    int timeout_ms;
 };
+
+static long long monotonic_ms(void) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) return 0;
+    return (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+// 다음 요청의 읽기 마감 시각을 지금부터 제한 시간 뒤로 정합니다.
+static void conn_start_request_clock(struct conn *c) {
+    c->deadline_ms = monotonic_ms() + c->timeout_ms;
+}
+
+// 읽을 데이터가 오면 1, 마감 시각이 지나면 0, poll 오류면 -1을 돌려줍니다.
+static int conn_wait_readable(const struct conn *c) {
+    for (;;) {
+        long long left = c->deadline_ms - monotonic_ms();
+        if (left <= 0) return 0;
+        int ready = net_wait(c->fd, POLLIN, left > INT_MAX ? INT_MAX : (int)left);
+        if (ready < 0 && errno == EINTR) continue;
+        return ready;
+    }
+}
 
 // 상태 출력에 사용할 단계 이름을 돌려줍니다.
 static const char *conn_state_name(enum conn_state state) {
@@ -89,8 +118,10 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
     struct conn c = {
         .fd = fd,
         .state = CONN_READING,
-        .rlen = 0
+        .rlen = 0,
+        .timeout_ms = cfg->timeout_sec * 1000
     };
+    conn_start_request_clock(&c);
 
     // 현재 단계가 닫힘에 도달할 때까지 이 연결의 처리 단계를 진행합니다.
     while (c.state != CONN_CLOSED) {
@@ -113,8 +144,16 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     break;
                 }
 
-                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
-                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                // 마감 시각 안에 바이트가 오면 rbuf의 기존 데이터 뒤에 이어 받습니다.
+                // 마감이 지나면 소켓 제한 시간이 끝난 경우와 같은 경로(408 후 종료)로 보냅니다.
+                ssize_t n;
+                int ready = conn_wait_readable(&c);
+                if (ready <= 0) {
+                    n = -1;
+                    if (ready == 0) errno = EAGAIN;
+                } else {
+                    n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                }
                 if (n < 0) {
                     if (errno == EINTR) break;
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -188,8 +227,16 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
 
                         // Content-Length가 가리키는 나머지 바이트만 더 받습니다.
                         while (received < expected) {
-                            ssize_t n = recv(c.fd, c.body + received,
-                                             expected - received, 0);
+                            // 본문도 같은 요청 마감 시각 안에 모두 받아야 합니다.
+                            ssize_t n;
+                            int ready = conn_wait_readable(&c);
+                            if (ready <= 0) {
+                                n = -1;
+                                if (ready == 0) errno = EAGAIN;
+                            } else {
+                                n = recv(c.fd, c.body + received,
+                                         expected - received, 0);
+                            }
                             if (n < 0) {
                                 if (errno == EINTR) continue;
                                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -242,14 +289,10 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 int serve_result = 0;
                 int proxy_handled = 0;
                 int invalidates_cache = strcmp(req.method, "GET") != 0;
-                if (cache_request_lock(invalidates_cache) < 0) {
-                    server_log_errno("cache request lock", errno);
-                    conn_set_state(&c, CONN_CLOSING);
-                    break;
-                }
                 if (invalidates_cache) {
-                    // 쓰기 잠금 안에서 기존 응답을 지워 이후 읽기가 원본을 확인하게 합니다.
-                    cache_invalidate_all();
+                    // 기존 응답을 지우고, 이 요청이 끝날 때까지 GET이 캐시를 건너뛰게 합니다.
+                    // 요청 처리 동안 잠금을 잡지 않으므로 다른 연결은 기다리지 않습니다.
+                    cache_write_begin();
                 }
                 struct cache_capture capture;
                 struct cache_capture *capture_ptr = NULL;
@@ -259,14 +302,12 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                     int cache_result = cache_lookup_send(c.fd, cache_key,
                                                          c.keep_alive);
                     if (cache_result < 0) {
-                        cache_request_unlock();
                         conn_set_state(&c, CONN_CLOSING);
                         break;
                     }
                     if (cache_result > 0) {
                         // HIT 응답은 저장된 Content-Length로 끝나므로 연결을 유지할 수 있습니다.
                         c.response_sent = 1;
-                        cache_request_unlock();
                         conn_set_state(&c, CONN_RESPONDING);
                         break;
                     }
@@ -302,11 +343,10 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 }
                 if (invalidates_cache) {
                     // 변경 응답을 마친 뒤 다시 비워 변경 중 생성된 항목도 제거합니다.
-                    cache_invalidate_all();
+                    cache_write_end();
                 }
                 if (serve_result < 0) {
                     cache_capture_abort(capture_ptr);
-                    cache_request_unlock();
                     if (errno != EPIPE && errno != ECONNRESET) {
                         server_log_errno("static_serve", errno);
                     }
@@ -316,12 +356,6 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 if (capture_ptr != NULL && !capture_ptr->keep_alive)
                     c.keep_alive = 0;
                 if (capture_ptr != NULL && cache_capture_finish(capture_ptr) < 0) {
-                    cache_request_unlock();
-                    conn_set_state(&c, CONN_CLOSING);
-                    break;
-                }
-                if (cache_request_unlock() < 0) {
-                    server_log_errno("cache request unlock", errno);
                     conn_set_state(&c, CONN_CLOSING);
                     break;
                 }
@@ -369,6 +403,7 @@ void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
                 c.body = NULL;
                 c.body_len = 0;
                 c.response_sent = 0;
+                conn_start_request_clock(&c);
                 conn_set_state(&c, CONN_READING);
                 break;
 

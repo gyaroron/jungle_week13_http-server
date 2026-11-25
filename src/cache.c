@@ -27,7 +27,8 @@ struct cache_entry {
 };
 
 static pthread_mutex_t cache_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_rwlock_t cache_consistency_lock = PTHREAD_RWLOCK_INITIALIZER;
+// 진행 중인 비-GET 요청 수입니다. 0이 아니면 GET은 캐시를 건너뛰고 원본을 읽습니다.
+static unsigned cache_writers;
 static struct cache_entry *cache_head;
 static struct cache_entry *cache_tail;
 static size_t cache_entries;
@@ -238,23 +239,26 @@ int cache_key_for_request(const struct http_request *req,
     return 1;
 }
 
-int cache_request_lock(int is_write) {
-    int result = is_write ? pthread_rwlock_wrlock(&cache_consistency_lock) :
-                            pthread_rwlock_rdlock(&cache_consistency_lock);
-    if (result != 0) {
-        errno = result;
-        return -1;
-    }
-    return 0;
+// 전체 비우기와 세대 증가는 cache_mutex를 잡은 호출자만 부릅니다.
+static void invalidate_all_locked(void) {
+    while (cache_head != NULL) remove_oldest_locked();
+    // 진행 중인 이전 GET 캡처가 변경 뒤에 낡은 항목을 저장하지 못하게 합니다.
+    cache_generation++;
 }
 
-int cache_request_unlock(void) {
-    int result = pthread_rwlock_unlock(&cache_consistency_lock);
-    if (result != 0) {
-        errno = result;
-        return -1;
-    }
-    return 0;
+void cache_write_begin(void) {
+    pthread_mutex_lock(&cache_mutex);
+    cache_writers++;
+    invalidate_all_locked();
+    pthread_mutex_unlock(&cache_mutex);
+}
+
+void cache_write_end(void) {
+    pthread_mutex_lock(&cache_mutex);
+    // 변경 중에 만들어진 항목까지 지운 뒤에야 GET의 캐시 사용을 다시 허용합니다.
+    invalidate_all_locked();
+    if (cache_writers > 0) cache_writers--;
+    pthread_mutex_unlock(&cache_mutex);
 }
 
 static int transformed_header(const unsigned char *raw, size_t raw_length,
@@ -394,6 +398,11 @@ int cache_lookup_send(int client_fd, const char *key, int keep_alive) {
     unsigned char *copy = NULL;
     size_t length = 0;
     pthread_mutex_lock(&cache_mutex);
+    if (cache_writers > 0) {
+        // 변경 요청이 끝나기 전에는 이전 응답을 돌려주지 않고 원본을 읽게 합니다.
+        pthread_mutex_unlock(&cache_mutex);
+        return 0;
+    }
     remove_expired_locked(&now);
     struct cache_entry **link = &cache_head;
     while (*link != NULL) {
@@ -586,7 +595,7 @@ int cache_capture_finish(struct cache_capture *capture) {
             entry->expires_at.tv_sec += (time_t)capture->ttl_seconds;
             pthread_mutex_lock(&cache_mutex);
             remove_expired_locked(&now);
-            if (capture->generation == cache_generation) {
+            if (capture->generation == cache_generation && cache_writers == 0) {
                 struct cache_entry **link = &cache_head;
                 while (*link != NULL) {
                     if (strcmp((*link)->key, entry->key) == 0) {
@@ -639,9 +648,7 @@ void cache_capture_abort(struct cache_capture *capture) {
 
 void cache_invalidate_all(void) {
     pthread_mutex_lock(&cache_mutex);
-    while (cache_head != NULL) remove_oldest_locked();
-    // 진행 중인 이전 GET 응답이 변경 뒤에 낡은 항목을 저장하지 못하게 합니다.
-    cache_generation++;
+    invalidate_all_locked();
     pthread_mutex_unlock(&cache_mutex);
 }
 

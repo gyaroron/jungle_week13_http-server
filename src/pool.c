@@ -103,7 +103,7 @@ fail:
     return NULL;
 }
 
-// 큐가 가득 찬 동안 기다렸다가 연결 fd를 원형 대기열에 넣습니다.
+// 연결 fd를 원형 대기열에 넣습니다. 큐가 가득 차 있으면 기다리지 않습니다.
 int pool_submit(struct pool *p, int fd) {
     if (p == NULL) {
         errno = EINVAL;
@@ -116,13 +116,12 @@ int pool_submit(struct pool *p, int fd) {
         return -1;
     }
 
-    while (p->count == p->queue_cap && !p->stopping) {
-        result = pthread_cond_wait(&p->not_full, &p->mutex);
-        if (result != 0) {
-            pthread_mutex_unlock(&p->mutex);
-            errno = result;
-            return -1;
-        }
+    // 대기열이 가득 차면 기다리지 않고 바로 실패를 돌려줍니다.
+    // 기다리면 accept() 반복 전체가 멈추고 종료 신호(g_stop)도 확인할 수 없습니다.
+    if (p->count == p->queue_cap && !p->stopping) {
+        pthread_mutex_unlock(&p->mutex);
+        errno = EAGAIN;
+        return -1;
     }
 
     if (p->stopping) {
@@ -137,6 +136,27 @@ int pool_submit(struct pool *p, int fd) {
     pthread_cond_signal(&p->not_empty);
     pthread_mutex_unlock(&p->mutex);
     return 0;
+}
+
+int pool_reject_queued(struct pool *p, void (*reject)(int fd)) {
+    if (p == NULL || reject == NULL) return 0;
+    int taken[256];
+    int total = 0;
+    for (;;) {
+        // mutex 안에서는 fd 번호만 옮기고, 응답 전송은 mutex 밖에서 합니다.
+        int n = 0;
+        pthread_mutex_lock(&p->mutex);
+        while (p->count > 0 && n < (int)(sizeof(taken) / sizeof(taken[0]))) {
+            taken[n++] = p->queue[p->head];
+            p->head = (p->head + 1) % p->queue_cap;
+            p->count--;
+        }
+        pthread_cond_broadcast(&p->not_full);
+        pthread_mutex_unlock(&p->mutex);
+        if (n == 0) return total;
+        for (int i = 0; i < n; i++) reject(taken[i]);
+        total += n;
+    }
 }
 
 // 제출을 막고 대기 중인 일꾼을 깨운 뒤 큐를 비우고 자원을 해제합니다.

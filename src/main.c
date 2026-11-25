@@ -3,6 +3,7 @@
 #include "log.h"
 #include "net.h"
 #include "pool.h"
+#include "response.h"
 #include "route.h"
 
 #include <arpa/inet.h>
@@ -40,6 +41,12 @@ static void serve_connection(int fd) {
 static void cleanup_routes(struct route *routes, int route_count) {
     route_destroy(routes, route_count);
     free(routes);
+}
+
+// 종료 중이라 처리하지 않을 대기 연결에 503을 보내고 닫습니다.
+static void reject_queued_connection(int fd) {
+    (void)resp_send_error(fd, 503);
+    close(fd);
 }
 
 static void request_stop(int signal_number) {
@@ -183,14 +190,25 @@ int main(int argc, char **argv) {
 
         // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
         if (pool_submit(workers, conn_fd) < 0) {
-            server_log_errno("pool_submit", errno);
+            if (errno == EAGAIN) {
+                // 일꾼과 대기열이 모두 찼으면 짧은 503을 보내고 닫아 수락 반복을 지킵니다.
+                server_log("fd %d: worker queue full, sending 503\n", conn_fd);
+                (void)resp_send_error(conn_fd, 503);
+            } else {
+                server_log_errno("pool_submit", errno);
+            }
             close(conn_fd);
         }
     }
 
     close(listen_fd);
+    // 처리 중인 요청은 끝내되, 아직 시작하지 않은 대기 연결은 기다리지 않고 503으로 돌려보냅니다.
+    int rejected = pool_reject_queued(workers, reject_queued_connection);
+    if (rejected > 0) server_log("shutdown: rejected %d queued connections with 503\n", rejected);
     pool_shutdown(workers);
     server_log("server stopped\n");
     cleanup_routes(routes, cfg.route_count);
+    // stderr가 막혀 있어도 종료가 멈추지 않도록 최대 1초만 기다립니다.
+    server_log_flush(1000);
     return 0;
 }
