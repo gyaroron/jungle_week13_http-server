@@ -3,8 +3,12 @@
 
 #include "config.h"
 #include "http.h"
+#include "cache.h"
 
 // 0은 파일 응답 완료, 1은 오류 응답 완료, -1은 전송 실패입니다.
 int static_serve(int fd, const struct config *cfg, const struct http_request *req);
+int static_serve_cached(int fd, const struct config *cfg,
+                        const struct http_request *req,
+                        struct cache_capture *capture);
 
 #endif
