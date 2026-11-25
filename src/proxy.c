@@ -1,5 +1,6 @@
 #include "proxy.h"
 
+#include "cache.h"
 #include "log.h"
 #include "net.h"
 #include "response.h"
@@ -177,7 +178,8 @@ static int proxy_exchange_connected(int client_fd,
                                     int upstream_fd, const char *host_header,
                                     const char *request_target,
                                     const char *client_ip,
-                                    int timeout_ms) {
+                                    int timeout_ms,
+                                    struct cache_capture *capture) {
     size_t request_len = 0;
     char *request = build_request(req, request_target, host_header,
                                   body_len, client_ip, &request_len);
@@ -244,7 +246,10 @@ static int proxy_exchange_connected(int client_fd,
         }
         if (count == 0) break;
 
-        if (net_send_all(client_fd, buffer, (size_t)count) < 0) {
+        int send_result = capture != NULL ?
+            cache_capture_write(capture, buffer, (size_t)count) :
+            net_send_all(client_fd, buffer, (size_t)count);
+        if (send_result < 0) {
             int saved_error = errno;
             if (saved_error != EPIPE && saved_error != ECONNRESET) {
                 server_log("client response send failed (errno=%d)\n",
@@ -265,7 +270,7 @@ static int proxy_exchange(int client_fd, const struct http_request *req,
                           const char *body, size_t body_len,
                           const struct upstream *upstream,
                           const char *request_target, const char *client_ip,
-                          int timeout_ms) {
+                          int timeout_ms, struct cache_capture *capture) {
     int upstream_fd = net_connect(upstream->host, upstream->port, timeout_ms);
     if (upstream_fd < 0) {
         int saved_error = errno;
@@ -276,13 +281,15 @@ static int proxy_exchange(int client_fd, const struct http_request *req,
     }
     return proxy_exchange_connected(client_fd, req, body, body_len,
                                     upstream_fd, upstream->host_header,
-                                    request_target, client_ip, timeout_ms);
+                                    request_target, client_ip, timeout_ms,
+                                    capture);
 }
 
 // 라우팅 규칙을 찾아 백엔드를 차례로 시도하고 응답을 그대로 전달합니다.
-int proxy_reverse(int client_fd, const struct http_request *req,
-                  const char *body, size_t body_len, const struct config *cfg,
-                  const char *client_ip) {
+int proxy_reverse_cached(int client_fd, const struct http_request *req,
+                         const char *body, size_t body_len,
+                         const struct config *cfg, const char *client_ip,
+                         struct cache_capture *capture) {
     struct route *route = route_match(cfg->routes, cfg->route_count,
                                       http_header_get(req, "Host"), req->target);
     if (route == NULL) return PROXY_NO_ROUTE;
@@ -311,13 +318,21 @@ int proxy_reverse(int client_fd, const struct http_request *req,
         }
         return proxy_exchange_connected(client_fd, req, body, body_len,
                                         upstream_fd, upstream.host_header,
-                                        req->target, client_ip, timeout_ms);
+                                        req->target, client_ip, timeout_ms,
+                                        capture);
     }
 
     int status = last_error == ETIMEDOUT ? 504 : 502;
     server_log("all route backends failed (errno=%d, status=%d)\n",
                last_error, status);
     return resp_send_error(client_fd, status) < 0 ? PROXY_FAILED : PROXY_HANDLED;
+}
+
+int proxy_reverse(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, const struct config *cfg,
+                  const char *client_ip) {
+    return proxy_reverse_cached(client_fd, req, body, body_len, cfg, client_ip,
+                                NULL);
 }
 
 // http:// authority와 경로를 나눠 포워드 프록시 목적지를 구성합니다.
@@ -389,9 +404,10 @@ static int parse_absolute_target(const char *target, struct upstream *upstream,
 }
 
 // -f 모드에서 absolute-form 요청을 origin-form으로 바꾸어 전달합니다.
-int proxy_forward(int client_fd, const struct http_request *req,
-                  const char *body, size_t body_len, int timeout_sec,
-                  const char *client_ip) {
+int proxy_forward_cached(int client_fd, const struct http_request *req,
+                         const char *body, size_t body_len, int timeout_sec,
+                         const char *client_ip,
+                         struct cache_capture *capture) {
     struct upstream upstream;
     memset(&upstream, 0, sizeof(upstream));
     char origin[2048];
@@ -402,5 +418,12 @@ int proxy_forward(int client_fd, const struct http_request *req,
                PROXY_FAILED : PROXY_HANDLED;
     }
     return proxy_exchange(client_fd, req, body, body_len, &upstream, origin,
-                          client_ip, timeout_sec * 1000);
+                          client_ip, timeout_sec * 1000, capture);
+}
+
+int proxy_forward(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, int timeout_sec,
+                  const char *client_ip) {
+    return proxy_forward_cached(client_fd, req, body, body_len, timeout_sec,
+                                client_ip, NULL);
 }
