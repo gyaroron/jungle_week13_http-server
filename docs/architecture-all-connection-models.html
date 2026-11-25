@@ -1,0 +1,3608 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>C 웹서버 · 프록시 전체 코드 아키텍처</title><style>
+:root{color-scheme:light dark;--bg:#10151c;--panel:#18212b;--line:#384758;--fg:#edf3f8;--muted:#b0bdc9;--accent:#81d8bd;--blue:#82b9ff;--gold:#f3c779;--rose:#f0a1a1}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif}main{max-width:1240px;margin:auto;padding:28px 20px 56px}h1{font-size:28px;margin:0 0 5px}h2{font-size:20px;margin:30px 0 7px}h3{font-size:16px;margin:0 0 7px}.lead,.muted{color:var(--muted)}.controls{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.controls button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:9px 14px;cursor:pointer}.controls button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}.panel{padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin:12px 0}.model[hidden]{display:none}.arch-wrap{overflow-x:auto;max-width:100%}.arch{display:block;width:100%;height:auto;min-width:760px;color:var(--accent)}.arch .lane rect{fill:var(--panel);stroke:var(--line)}.arch .lane text{fill:var(--muted);font-size:14px}.arch .node rect{fill:#1d2a34;stroke:var(--accent);stroke-width:1.5}.arch .node text{fill:var(--fg);font-size:15px}.arch .nmain rect{stroke:var(--gold)}.arch .edge{fill:none;stroke:currentColor;stroke-width:1.6}.arch .elabel{fill:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}.component{min-width:0;border-top:2px solid var(--accent);padding:12px;background:var(--panel);border-radius:8px}.component .path{display:block;color:var(--blue);overflow-wrap:anywhere}.component p{margin:6px 0;color:var(--muted)}.file{margin:7px 0;border-top:1px solid var(--line);padding-top:7px}.file summary{cursor:pointer;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px}.file summary span{color:var(--muted);font:12px ui-monospace,monospace}.file p{font-size:12px;line-height:1.9}.file pre{max-height:520px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:12px;border-radius:7px;font:12px/1.55 ui-monospace,Menlo,monospace}.callout{border-left:3px solid var(--gold);padding:10px 13px;background:var(--panel);color:var(--muted)}.legend{display:flex;flex-wrap:wrap;gap:14px;color:var(--muted);font-size:13px}.line-table{width:100%;border-collapse:collapse}.line-table td,.line-table th{text-align:left;vertical-align:top;padding:8px;border-bottom:1px solid var(--line)}code{overflow-wrap:anywhere}@media(max-width:640px){main{padding:18px 12px}.arch{min-width:760px}h1{font-size:23px}}
+</style></head><body><main><header><h1>C 웹서버 · 프록시 전체 코드 아키텍처</h1><p class="lead">세 연결 처리 모델을 같은 요청 처리 컴포넌트에 연결했습니다. 컴포넌트를 펼치면 해당 파일의 전체 소스와 함수 시작 행을 볼 수 있습니다.</p><p class="muted">기준: c-webserver-proxy 독립 저장소 · 로컬 브랜치 · 2026-11-25. 파일 전체 행 범위와 함수 정의 행을 함께 적었습니다.</p></header><nav class="controls" aria-label="연결 처리 모델 선택"><button type="button" data-model="seq" aria-pressed="true">순차 처리</button><button type="button" data-model="per" aria-pressed="false">연결별 스레드</button><button type="button" data-model="pool" aria-pressed="false">고정 크기 스레드 풀</button></nav><section class="panel model" id="model-seq" ><h2>순차 처리 · stage6-sequential</h2><p>main 스레드가 conn_handle() 처리를 끝낸 뒤 다음 accept()로 이동합니다. 기준 커밋 <code>685fdfc</code>.</p><div class="callout">흐름: 클라이언트 → <code>src/main.c</code> src/main.c:173–174 → 공통 <code>src/net.c</code> → <code>src/conn.c</code> → HTTP 파서와 정적 파일·CGI·프록시 중 하나 → 연결 종료 또는 유지.</div><div class="arch-wrap"><svg viewBox="0 0 1120 660" role="img" aria-labelledby="arch-title arch-desc" class="arch"><title id="arch-title">웹 서버 전체 컴포넌트와 연결 처리 경로</title><desc id="arch-desc">세 연결 처리 모델은 main에서 갈라지고, 이후 net, conn, HTTP parser 및 정적 파일, CGI, proxy 요청 처리 컴포넌트를 공유합니다.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g class="lane"><rect x="20" y="20" width="1080" height="90" rx="12"/><text x="42" y="48">클라이언트</text><text x="42" y="78">curl · 브라우저 · nc</text></g>
+<g class="node nmain"><rect x="390" y="140" width="340" height="80" rx="12"/><text x="560" y="172" text-anchor="middle">main.c · 연결 분배</text><text x="560" y="198" text-anchor="middle">listen → accept → model dispatch</text></g>
+<path class="edge" d="M560 110V140" marker-end="url(#arrow)"/><text class="elabel" x="575" y="130">TCP 연결</text>
+<g class="node"><rect x="390" y="280" width="340" height="68" rx="12"/><text x="560" y="308" text-anchor="middle">net.c · 소켓·전송</text><text x="560" y="330" text-anchor="middle">conn_fd / connect / timeout / send-all</text></g>
+<path class="edge" d="M560 220V280" marker-end="url(#arrow)"/><text class="elabel" x="575" y="255">fd 전달</text>
+<g class="node"><rect x="390" y="400" width="340" height="68" rx="12"/><text x="560" y="428" text-anchor="middle">conn.c · 연결 상태 머신</text><text x="560" y="450" text-anchor="middle">recv → parse → route → response</text></g><path class="edge" d="M560 348V400" marker-end="url(#arrow)"/>
+<g class="node"><rect x="40" y="535" width="250" height="82" rx="12"/><text x="165" y="565" text-anchor="middle">http.c · 요청 파서</text><text x="165" y="590" text-anchor="middle">request line · headers · body length</text></g>
+<g class="node"><rect x="330" y="535" width="250" height="82" rx="12"/><text x="455" y="565" text-anchor="middle">정적 파일 · CGI</text><text x="455" y="590" text-anchor="middle">static.c · mime.c · cgi.c</text></g>
+<g class="node"><rect x="620" y="535" width="250" height="82" rx="12"/><text x="745" y="565" text-anchor="middle">proxy.c · 업스트림 중계</text><text x="745" y="590" text-anchor="middle">route.c selects backend</text></g>
+<g class="node"><rect x="910" y="535" width="170" height="82" rx="12"/><text x="995" y="565" text-anchor="middle">response.c</text><text x="995" y="590" text-anchor="middle">HTTP error</text></g>
+<path class="edge" d="M460 468L165 535" marker-end="url(#arrow)"/><path class="edge" d="M515 468L455 535" marker-end="url(#arrow)"/><path class="edge" d="M610 468L745 535" marker-end="url(#arrow)"/><path class="edge" d="M680 468L995 535" marker-end="url(#arrow)"/>
+<g class="lane"><rect x="20" y="630" width="1080" height="24" rx="8"/><text x="560" y="648" text-anchor="middle">log.c observes events · config.c supplies settings · include/*.h defines shared interfaces</text></g></svg></div><h3>이 다이어그램의 해설</h3><p>accept()가 돌려준 conn_fd를 main 스레드가 serve_connection()에 직접 넘깁니다. 그 호출이 끝나기 전에는 main이 다음 accept()를 수행하지 않습니다. 세 모델에서 달라지는 코드는 연결을 받은 뒤 처리 담당자에게 넘기는 부분입니다. 요청 파싱과 서비스 모듈은 공통으로 사용됩니다.</p><div class="component"><b>이 모델의 분배·종료 코드</b><details class="file"><summary><b>src/main.c</b><span>stage6-sequential · src/main.c:1–181행 · 181행</span></summary><p>함수 정의 시작 행: <code>serve_connection()</code> 22행 · <code>cleanup_routes()</code> 37행 · <code>request_stop()</code> 42행 · <code>main()</code> 47행</p><pre><code>#include &quot;conn.h&quot;
+#include &quot;config.h&quot;
+#include &quot;log.h&quot;
+#include &quot;net.h&quot;
+#include &quot;route.h&quot;
+
+#include &lt;arpa/inet.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;unistd.h&gt;
+
+static volatile sig_atomic_t g_stop = 0;
+static const struct config *g_worker_config = NULL;
+
+// 일꾼이 받은 연결 번호를 기존 연결 처리기에 전달합니다.
+static void serve_connection(int fd) {
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
+    char client_ip[INET_ADDRSTRLEN] = &quot;unknown&quot;;
+    if (getpeername(fd, (struct sockaddr *)&amp;peer, &amp;peer_len) == 0) {
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, client_ip,
+                      sizeof(client_ip)) == NULL) {
+            client_ip[0] = &#x27;\0&#x27;;
+            memcpy(client_ip, &quot;unknown&quot;, sizeof(&quot;unknown&quot;));
+        }
+    }
+    conn_handle(fd, client_ip, g_worker_config);
+}
+
+// 부분적으로 읽은 라우팅 규칙도 초기화된 mutex만 정리합니다.
+static void cleanup_routes(struct route *routes, int route_count) {
+    route_destroy(routes, route_count);
+    free(routes);
+}
+
+static void request_stop(int signal_number) {
+    (void)signal_number;
+    g_stop = 1;
+}
+
+int main(int argc, char **argv) {
+    struct config cfg;
+    int config_result = config_parse(argc, argv, &amp;cfg);
+    if (config_result != 0) {
+        return config_result &gt; 0 ? 0 : 2;
+    }
+
+    struct route *routes = NULL;
+    if (cfg.routes_path != NULL) {
+        routes = calloc(ROUTE_MAX, sizeof(*routes));
+        if (routes == NULL) {
+            server_log_errno(&quot;allocate routes&quot;, errno);
+            return 1;
+        }
+        int count = route_load(cfg.routes_path, routes, ROUTE_MAX);
+        if (count &lt; 0) {
+            server_log_errno(&quot;load routes&quot;, errno);
+            cleanup_routes(routes, 0);
+            return 1;
+        }
+        cfg.routes = routes;
+        cfg.route_count = count;
+        server_log(&quot;loaded %d route rules from %s\n&quot;, count, cfg.routes_path);
+    }
+
+    // 종료 신호를 받으면 accept 반복을 끝내도록 상태만 표시합니다.
+    struct sigaction stop_action = {0};
+    stop_action.sa_handler = request_stop;
+    sigemptyset(&amp;stop_action.sa_mask);
+    if (sigaction(SIGINT, &amp;stop_action, NULL) &lt; 0 ||
+        sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction stop&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 끊긴 클라이언트에 send해도 SIGPIPE가 서버 프로세스를 끝내지 않게 합니다.
+    struct sigaction ignore_pipe = {0};
+    ignore_pipe.sa_handler = SIG_IGN;
+    sigemptyset(&amp;ignore_pipe.sa_mask);
+    if (sigaction(SIGPIPE, &amp;ignore_pipe, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction SIGPIPE&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // net_listen()에 서버 주소와 포트, 대기 큐 크기를 전달해 듣는 소켓을 준비시킵니다.
+    int listen_fd = net_listen(cfg.host, cfg.port, cfg.backlog);
+    if (listen_fd &lt; 0) {
+        // net_listen()이 실패 이유를 이미 출력했으므로 서버를 종료합니다.
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+    if (net_set_nonblock(listen_fd) &lt; 0) {
+        server_log_errno(&quot;fcntl listen nonblock&quot;, errno);
+        close(listen_fd);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
+    server_log(&quot;listening on %s:%d (fd %d)\n&quot;, cfg.host, cfg.port, listen_fd);
+
+    // 연결 처리 함수가 요청 처리 설정을 읽도록 주소를 보관합니다.
+    g_worker_config = &amp;cfg;
+
+    // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
+    while (!g_stop) {
+        int ready = net_wait(listen_fd, POLLIN, 1000);
+        if (ready == 0) continue;
+        if (ready &lt; 0) {
+            if (errno == EINTR) continue;
+            server_log_errno(&quot;poll&quot;, errno);
+            continue;
+        }
+
+        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }
+
+        // macOS는 듣는 소켓의 비차단 설정을 물려주므로 연결 소켓을 차단 모드로 되돌립니다.
+        if (net_set_blocking(conn_fd) &lt; 0) {
+            server_log_errno(&quot;fcntl connection blocking&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        if (net_set_timeouts(conn_fd, cfg.timeout_sec) &lt; 0) {
+            server_log_errno(&quot;setsockopt timeout&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+
+#ifdef SO_NOSIGPIPE
+        // macOS 연결 소켓에 쓰기 중 SIGPIPE를 만들지 않도록 설정합니다.
+        int no_sigpipe = 1;
+        if (setsockopt(conn_fd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &amp;no_sigpipe, sizeof(no_sigpipe)) &lt; 0) {
+            server_log_errno(&quot;setsockopt SO_NOSIGPIPE&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+#endif
+
+        // 클라이언트 주소 구조체에 담긴 IPv4 주소를 사람이 읽는 문자열로 바꿉니다.
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, ip, sizeof(ip)) == NULL) {
+            // 주소 변환에 실패하면 이 연결 소켓을 닫고 다음 연결을 기다립니다.
+            server_log_errno(&quot;inet_ntop&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        // 새 연결 소켓 번호와 접속한 클라이언트 주소를 출력합니다.
+        server_log(&quot;accepted fd %d from %s:%d\n&quot;, conn_fd, ip,
+                   ntohs(peer.sin_port));
+
+        // 이 기준 모델은 accept()가 반환한 연결을 현재 main 스레드가 끝까지 처리합니다.
+        serve_connection(conn_fd);
+    }
+
+    close(listen_fd);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;
+}
+</code></pre></details></div></section><section class="panel model" id="model-per" hidden><h2>연결별 스레드 · stage6-per-connection</h2><p>수락한 연결마다 heap 인자와 pthread_create()로 스레드를 시작하고 detach합니다. 기준 커밋 <code>1eafd8a</code>.</p><div class="callout">흐름: 클라이언트 → <code>src/main.c</code> src/main.c:204–247; worker 44–65; shutdown 250–274 → 공통 <code>src/net.c</code> → <code>src/conn.c</code> → HTTP 파서와 정적 파일·CGI·프록시 중 하나 → 연결 종료 또는 유지.</div><div class="arch-wrap"><svg viewBox="0 0 1120 660" role="img" aria-labelledby="arch-title arch-desc" class="arch"><title id="arch-title">웹 서버 전체 컴포넌트와 연결 처리 경로</title><desc id="arch-desc">세 연결 처리 모델은 main에서 갈라지고, 이후 net, conn, HTTP parser 및 정적 파일, CGI, proxy 요청 처리 컴포넌트를 공유합니다.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g class="lane"><rect x="20" y="20" width="1080" height="90" rx="12"/><text x="42" y="48">클라이언트</text><text x="42" y="78">curl · 브라우저 · nc</text></g>
+<g class="node nmain"><rect x="390" y="140" width="340" height="80" rx="12"/><text x="560" y="172" text-anchor="middle">main.c · 연결 분배</text><text x="560" y="198" text-anchor="middle">listen → accept → model dispatch</text></g>
+<path class="edge" d="M560 110V140" marker-end="url(#arrow)"/><text class="elabel" x="575" y="130">TCP 연결</text>
+<g class="node"><rect x="390" y="280" width="340" height="68" rx="12"/><text x="560" y="308" text-anchor="middle">net.c · 소켓·전송</text><text x="560" y="330" text-anchor="middle">conn_fd / connect / timeout / send-all</text></g>
+<path class="edge" d="M560 220V280" marker-end="url(#arrow)"/><text class="elabel" x="575" y="255">fd 전달</text>
+<g class="node"><rect x="390" y="400" width="340" height="68" rx="12"/><text x="560" y="428" text-anchor="middle">conn.c · 연결 상태 머신</text><text x="560" y="450" text-anchor="middle">recv → parse → route → response</text></g><path class="edge" d="M560 348V400" marker-end="url(#arrow)"/>
+<g class="node"><rect x="40" y="535" width="250" height="82" rx="12"/><text x="165" y="565" text-anchor="middle">http.c · 요청 파서</text><text x="165" y="590" text-anchor="middle">request line · headers · body length</text></g>
+<g class="node"><rect x="330" y="535" width="250" height="82" rx="12"/><text x="455" y="565" text-anchor="middle">정적 파일 · CGI</text><text x="455" y="590" text-anchor="middle">static.c · mime.c · cgi.c</text></g>
+<g class="node"><rect x="620" y="535" width="250" height="82" rx="12"/><text x="745" y="565" text-anchor="middle">proxy.c · 업스트림 중계</text><text x="745" y="590" text-anchor="middle">route.c selects backend</text></g>
+<g class="node"><rect x="910" y="535" width="170" height="82" rx="12"/><text x="995" y="565" text-anchor="middle">response.c</text><text x="995" y="590" text-anchor="middle">HTTP error</text></g>
+<path class="edge" d="M460 468L165 535" marker-end="url(#arrow)"/><path class="edge" d="M515 468L455 535" marker-end="url(#arrow)"/><path class="edge" d="M610 468L745 535" marker-end="url(#arrow)"/><path class="edge" d="M680 468L995 535" marker-end="url(#arrow)"/>
+<g class="lane"><rect x="20" y="630" width="1080" height="24" rx="8"/><text x="560" y="648" text-anchor="middle">log.c observes events · config.c supplies settings · include/*.h defines shared interfaces</text></g></svg></div><h3>이 다이어그램의 해설</h3><p>accept() 뒤 malloc()으로 fd를 담을 connection_job을 만들고 pthread_create()로 새 스레드를 실행합니다. worker는 인자를 꺼내 처리한 뒤 종료하고, main은 종료 시 활성 스레드가 0이 될 때까지 기다립니다. 세 모델에서 달라지는 코드는 연결을 받은 뒤 처리 담당자에게 넘기는 부분입니다. 요청 파싱과 서비스 모듈은 공통으로 사용됩니다.</p><div class="component"><b>이 모델의 분배·종료 코드</b><details class="file"><summary><b>src/main.c</b><span>stage6-per-connection · src/main.c:1–275행 · 275행</span></summary><p>함수 정의 시작 행: <code>connection_job()</code> 25행 · <code>serve_connection()</code> 30행 · <code>serve_connection_thread()</code> 45행 · <code>cleanup_routes()</code> 69행 · <code>request_stop()</code> 74행 · <code>main()</code> 79행</p><pre><code>#include &quot;conn.h&quot;
+#include &quot;config.h&quot;
+#include &quot;log.h&quot;
+#include &quot;net.h&quot;
+#include &quot;route.h&quot;
+
+#include &lt;arpa/inet.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;unistd.h&gt;
+
+static volatile sig_atomic_t g_stop = 0;
+static const struct config *g_worker_config = NULL;
+static pthread_mutex_t g_active_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_active_changed = PTHREAD_COND_INITIALIZER;
+static size_t g_active_threads = 0;
+
+struct connection_job {
+    int fd;
+};
+
+// 일꾼이 받은 연결 번호를 기존 연결 처리기에 전달합니다.
+static void serve_connection(int fd) {
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
+    char client_ip[INET_ADDRSTRLEN] = &quot;unknown&quot;;
+    if (getpeername(fd, (struct sockaddr *)&amp;peer, &amp;peer_len) == 0) {
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, client_ip,
+                      sizeof(client_ip)) == NULL) {
+            client_ip[0] = &#x27;\0&#x27;;
+            memcpy(client_ip, &quot;unknown&quot;, sizeof(&quot;unknown&quot;));
+        }
+    }
+    conn_handle(fd, client_ip, g_worker_config);
+}
+
+// 연결별 스레드는 heap에 받은 연결 번호를 꺼낸 뒤, 기존 연결 처리기를 실행합니다.
+static void *serve_connection_thread(void *argument) {
+    struct connection_job *job = argument;
+    int fd = job-&gt;fd;
+    free(job);
+
+    serve_connection(fd);
+
+    int result = pthread_mutex_lock(&amp;g_active_mutex);
+    if (result != 0) {
+        server_log_errno(&quot;pthread_mutex_lock active&quot;, result);
+        _exit(1);
+    }
+    g_active_threads--;
+    result = pthread_cond_broadcast(&amp;g_active_changed);
+    int unlock_result = pthread_mutex_unlock(&amp;g_active_mutex);
+    if (result != 0 || unlock_result != 0) {
+        server_log_errno(&quot;pthread connection completion&quot;,
+                         result != 0 ? result : unlock_result);
+        _exit(1);
+    }
+    return NULL;
+}
+
+// 부분적으로 읽은 라우팅 규칙도 초기화된 mutex만 정리합니다.
+static void cleanup_routes(struct route *routes, int route_count) {
+    route_destroy(routes, route_count);
+    free(routes);
+}
+
+static void request_stop(int signal_number) {
+    (void)signal_number;
+    g_stop = 1;
+}
+
+int main(int argc, char **argv) {
+    struct config cfg;
+    int config_result = config_parse(argc, argv, &amp;cfg);
+    if (config_result != 0) {
+        return config_result &gt; 0 ? 0 : 2;
+    }
+
+    struct route *routes = NULL;
+    if (cfg.routes_path != NULL) {
+        routes = calloc(ROUTE_MAX, sizeof(*routes));
+        if (routes == NULL) {
+            server_log_errno(&quot;allocate routes&quot;, errno);
+            return 1;
+        }
+        int count = route_load(cfg.routes_path, routes, ROUTE_MAX);
+        if (count &lt; 0) {
+            server_log_errno(&quot;load routes&quot;, errno);
+            cleanup_routes(routes, 0);
+            return 1;
+        }
+        cfg.routes = routes;
+        cfg.route_count = count;
+        server_log(&quot;loaded %d route rules from %s\n&quot;, count, cfg.routes_path);
+    }
+
+    // 종료 신호를 받으면 accept 반복을 끝내도록 상태만 표시합니다.
+    struct sigaction stop_action = {0};
+    stop_action.sa_handler = request_stop;
+    sigemptyset(&amp;stop_action.sa_mask);
+    if (sigaction(SIGINT, &amp;stop_action, NULL) &lt; 0 ||
+        sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction stop&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 끊긴 클라이언트에 send해도 SIGPIPE가 서버 프로세스를 끝내지 않게 합니다.
+    struct sigaction ignore_pipe = {0};
+    ignore_pipe.sa_handler = SIG_IGN;
+    sigemptyset(&amp;ignore_pipe.sa_mask);
+    if (sigaction(SIGPIPE, &amp;ignore_pipe, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction SIGPIPE&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // net_listen()에 서버 주소와 포트, 대기 큐 크기를 전달해 듣는 소켓을 준비시킵니다.
+    int listen_fd = net_listen(cfg.host, cfg.port, cfg.backlog);
+    if (listen_fd &lt; 0) {
+        // net_listen()이 실패 이유를 이미 출력했으므로 서버를 종료합니다.
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+    if (net_set_nonblock(listen_fd) &lt; 0) {
+        server_log_errno(&quot;fcntl listen nonblock&quot;, errno);
+        close(listen_fd);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
+    server_log(&quot;listening on %s:%d (fd %d)\n&quot;, cfg.host, cfg.port, listen_fd);
+
+    // 연결별 스레드가 끝날 때까지 설정과 라우트를 읽기 전용으로 공유합니다.
+    g_worker_config = &amp;cfg;
+    // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
+    while (!g_stop) {
+        int ready = net_wait(listen_fd, POLLIN, 1000);
+        if (ready == 0) continue;
+        if (ready &lt; 0) {
+            if (errno == EINTR) continue;
+            server_log_errno(&quot;poll&quot;, errno);
+            continue;
+        }
+
+        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }
+
+        // macOS는 듣는 소켓의 비차단 설정을 물려주므로 연결 소켓을 차단 모드로 되돌립니다.
+        if (net_set_blocking(conn_fd) &lt; 0) {
+            server_log_errno(&quot;fcntl connection blocking&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        if (net_set_timeouts(conn_fd, cfg.timeout_sec) &lt; 0) {
+            server_log_errno(&quot;setsockopt timeout&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+
+#ifdef SO_NOSIGPIPE
+        // macOS 연결 소켓에 쓰기 중 SIGPIPE를 만들지 않도록 설정합니다.
+        int no_sigpipe = 1;
+        if (setsockopt(conn_fd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &amp;no_sigpipe, sizeof(no_sigpipe)) &lt; 0) {
+            server_log_errno(&quot;setsockopt SO_NOSIGPIPE&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+#endif
+
+        // 클라이언트 주소 구조체에 담긴 IPv4 주소를 사람이 읽는 문자열로 바꿉니다.
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, ip, sizeof(ip)) == NULL) {
+            // 주소 변환에 실패하면 이 연결 소켓을 닫고 다음 연결을 기다립니다.
+            server_log_errno(&quot;inet_ntop&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        // 새 연결 소켓 번호와 접속한 클라이언트 주소를 출력합니다.
+        server_log(&quot;accepted fd %d from %s:%d\n&quot;, conn_fd, ip,
+                   ntohs(peer.sin_port));
+
+        // 스레드가 연결 번호를 받기 전까지 보관할 heap 공간을 만듭니다.
+        struct connection_job *job = malloc(sizeof(*job));
+        if (job == NULL) {
+            server_log_errno(&quot;allocate connection job&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        job-&gt;fd = conn_fd;
+
+        pthread_t thread;
+        int thread_error = pthread_mutex_lock(&amp;g_active_mutex);
+        if (thread_error != 0) {
+            server_log_errno(&quot;pthread_mutex_lock active&quot;, thread_error);
+            free(job);
+            close(conn_fd);
+            continue;
+        }
+        g_active_threads++;
+        thread_error = pthread_create(&amp;thread, NULL,
+                                      serve_connection_thread, job);
+        if (thread_error != 0) {
+            g_active_threads--;
+            pthread_mutex_unlock(&amp;g_active_mutex);
+            server_log_errno(&quot;pthread_create&quot;, thread_error);
+            free(job);
+            close(conn_fd);
+            continue;
+        }
+        int unlock_error = pthread_mutex_unlock(&amp;g_active_mutex);
+        if (unlock_error != 0) {
+            server_log_errno(&quot;pthread_mutex_unlock active&quot;, unlock_error);
+            _exit(1);
+        }
+
+        // 분리한 스레드는 연결 하나를 끝낸 뒤 join 없이 종료합니다.
+        thread_error = pthread_detach(thread);
+        if (thread_error != 0) {
+            server_log_errno(&quot;pthread_detach&quot;, thread_error);
+            thread_error = pthread_join(thread, NULL);
+            if (thread_error != 0) {
+                server_log_errno(&quot;pthread_join fallback&quot;, thread_error);
+                _exit(1);
+            }
+        }
+    }
+
+    close(listen_fd);
+    // detached 스레드가 설정과 라우트를 다 쓸 때까지 main이 정리하지 않습니다.
+    int wait_error = pthread_mutex_lock(&amp;g_active_mutex);
+    if (wait_error != 0) {
+        server_log_errno(&quot;pthread_mutex_lock shutdown&quot;, wait_error);
+        _exit(1);
+    }
+    while (g_active_threads &gt; 0) {
+        wait_error = pthread_cond_wait(&amp;g_active_changed, &amp;g_active_mutex);
+        if (wait_error != 0) {
+            pthread_mutex_unlock(&amp;g_active_mutex);
+            server_log_errno(&quot;pthread_cond_wait shutdown&quot;, wait_error);
+            _exit(1);
+        }
+    }
+    wait_error = pthread_mutex_unlock(&amp;g_active_mutex);
+    if (wait_error != 0) {
+        server_log_errno(&quot;pthread_mutex_unlock shutdown&quot;, wait_error);
+        _exit(1);
+    }
+    pthread_cond_destroy(&amp;g_active_changed);
+    pthread_mutex_destroy(&amp;g_active_mutex);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;
+}
+</code></pre></details></div></section><section class="panel model" id="model-pool" hidden><h2>고정 크기 스레드 풀 · stage6-thread-pool</h2><p>main이 연결 fd를 대기열에 넣고 8개 worker가 꺼내 처리합니다. 기준 커밋 <code>56ef9f8</code>.</p><div class="callout">흐름: 클라이언트 → <code>src/main.c</code> src/main.c:115–121, 184–188, 191–194; src/pool.c:27–49, 52–164 → 공통 <code>src/net.c</code> → <code>src/conn.c</code> → HTTP 파서와 정적 파일·CGI·프록시 중 하나 → 연결 종료 또는 유지.</div><div class="arch-wrap"><svg viewBox="0 0 1120 660" role="img" aria-labelledby="arch-title arch-desc" class="arch"><title id="arch-title">웹 서버 전체 컴포넌트와 연결 처리 경로</title><desc id="arch-desc">세 연결 처리 모델은 main에서 갈라지고, 이후 net, conn, HTTP parser 및 정적 파일, CGI, proxy 요청 처리 컴포넌트를 공유합니다.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g class="lane"><rect x="20" y="20" width="1080" height="90" rx="12"/><text x="42" y="48">클라이언트</text><text x="42" y="78">curl · 브라우저 · nc</text></g>
+<g class="node nmain"><rect x="390" y="140" width="340" height="80" rx="12"/><text x="560" y="172" text-anchor="middle">main.c · 연결 분배</text><text x="560" y="198" text-anchor="middle">listen → accept → model dispatch</text></g>
+<path class="edge" d="M560 110V140" marker-end="url(#arrow)"/><text class="elabel" x="575" y="130">TCP 연결</text>
+<g class="node"><rect x="390" y="280" width="340" height="68" rx="12"/><text x="560" y="308" text-anchor="middle">net.c · 소켓·전송</text><text x="560" y="330" text-anchor="middle">conn_fd / connect / timeout / send-all</text></g>
+<path class="edge" d="M560 220V280" marker-end="url(#arrow)"/><text class="elabel" x="575" y="255">fd 전달</text>
+<g class="node"><rect x="390" y="400" width="340" height="68" rx="12"/><text x="560" y="428" text-anchor="middle">conn.c · 연결 상태 머신</text><text x="560" y="450" text-anchor="middle">recv → parse → route → response</text></g><path class="edge" d="M560 348V400" marker-end="url(#arrow)"/>
+<g class="node"><rect x="40" y="535" width="250" height="82" rx="12"/><text x="165" y="565" text-anchor="middle">http.c · 요청 파서</text><text x="165" y="590" text-anchor="middle">request line · headers · body length</text></g>
+<g class="node"><rect x="330" y="535" width="250" height="82" rx="12"/><text x="455" y="565" text-anchor="middle">정적 파일 · CGI</text><text x="455" y="590" text-anchor="middle">static.c · mime.c · cgi.c</text></g>
+<g class="node"><rect x="620" y="535" width="250" height="82" rx="12"/><text x="745" y="565" text-anchor="middle">proxy.c · 업스트림 중계</text><text x="745" y="590" text-anchor="middle">route.c selects backend</text></g>
+<g class="node"><rect x="910" y="535" width="170" height="82" rx="12"/><text x="995" y="565" text-anchor="middle">response.c</text><text x="995" y="590" text-anchor="middle">HTTP error</text></g>
+<path class="edge" d="M460 468L165 535" marker-end="url(#arrow)"/><path class="edge" d="M515 468L455 535" marker-end="url(#arrow)"/><path class="edge" d="M610 468L745 535" marker-end="url(#arrow)"/><path class="edge" d="M680 468L995 535" marker-end="url(#arrow)"/>
+<g class="lane"><rect x="20" y="630" width="1080" height="24" rx="8"/><text x="560" y="648" text-anchor="middle">log.c observes events · config.c supplies settings · include/*.h defines shared interfaces</text></g></svg></div><h3>이 다이어그램의 해설</h3><p>main이 pool_submit()으로 conn_fd를 큐에 넣습니다. pool_worker()가 mutex로 큐를 보호하며 fd를 꺼내 handler를 호출합니다. 종료 시 pool_shutdown()이 worker를 깨우고 join합니다. 세 모델에서 달라지는 코드는 연결을 받은 뒤 처리 담당자에게 넘기는 부분입니다. 요청 파싱과 서비스 모듈은 공통으로 사용됩니다.</p><div class="component"><b>이 모델의 분배·종료 코드</b><details class="file"><summary><b>src/main.c</b><span>stage6-thread-pool · src/main.c:1–196행 · 196행</span></summary><p>함수 정의 시작 행: <code>serve_connection()</code> 25행 · <code>cleanup_routes()</code> 40행 · <code>request_stop()</code> 45행 · <code>main()</code> 50행</p><pre><code>#include &quot;conn.h&quot;
+#include &quot;config.h&quot;
+#include &quot;log.h&quot;
+#include &quot;net.h&quot;
+#include &quot;pool.h&quot;
+#include &quot;route.h&quot;
+
+#include &lt;arpa/inet.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;unistd.h&gt;
+
+static volatile sig_atomic_t g_stop = 0;
+static const struct config *g_worker_config = NULL;
+
+#define APP_QUEUE_CAP 128
+
+// 일꾼이 받은 연결 번호를 기존 연결 처리기에 전달합니다.
+static void serve_connection(int fd) {
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
+    char client_ip[INET_ADDRSTRLEN] = &quot;unknown&quot;;
+    if (getpeername(fd, (struct sockaddr *)&amp;peer, &amp;peer_len) == 0) {
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, client_ip,
+                      sizeof(client_ip)) == NULL) {
+            client_ip[0] = &#x27;\0&#x27;;
+            memcpy(client_ip, &quot;unknown&quot;, sizeof(&quot;unknown&quot;));
+        }
+    }
+    conn_handle(fd, client_ip, g_worker_config);
+}
+
+// 부분적으로 읽은 라우팅 규칙도 초기화된 mutex만 정리합니다.
+static void cleanup_routes(struct route *routes, int route_count) {
+    route_destroy(routes, route_count);
+    free(routes);
+}
+
+static void request_stop(int signal_number) {
+    (void)signal_number;
+    g_stop = 1;
+}
+
+int main(int argc, char **argv) {
+    struct config cfg;
+    int config_result = config_parse(argc, argv, &amp;cfg);
+    if (config_result != 0) {
+        return config_result &gt; 0 ? 0 : 2;
+    }
+
+    struct route *routes = NULL;
+    if (cfg.routes_path != NULL) {
+        routes = calloc(ROUTE_MAX, sizeof(*routes));
+        if (routes == NULL) {
+            server_log_errno(&quot;allocate routes&quot;, errno);
+            return 1;
+        }
+        int count = route_load(cfg.routes_path, routes, ROUTE_MAX);
+        if (count &lt; 0) {
+            server_log_errno(&quot;load routes&quot;, errno);
+            cleanup_routes(routes, 0);
+            return 1;
+        }
+        cfg.routes = routes;
+        cfg.route_count = count;
+        server_log(&quot;loaded %d route rules from %s\n&quot;, count, cfg.routes_path);
+    }
+
+    // 종료 신호를 받으면 accept 반복을 끝내도록 상태만 표시합니다.
+    struct sigaction stop_action = {0};
+    stop_action.sa_handler = request_stop;
+    sigemptyset(&amp;stop_action.sa_mask);
+    if (sigaction(SIGINT, &amp;stop_action, NULL) &lt; 0 ||
+        sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction stop&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 끊긴 클라이언트에 send해도 SIGPIPE가 서버 프로세스를 끝내지 않게 합니다.
+    struct sigaction ignore_pipe = {0};
+    ignore_pipe.sa_handler = SIG_IGN;
+    sigemptyset(&amp;ignore_pipe.sa_mask);
+    if (sigaction(SIGPIPE, &amp;ignore_pipe, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction SIGPIPE&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // net_listen()에 서버 주소와 포트, 대기 큐 크기를 전달해 듣는 소켓을 준비시킵니다.
+    int listen_fd = net_listen(cfg.host, cfg.port, cfg.backlog);
+    if (listen_fd &lt; 0) {
+        // net_listen()이 실패 이유를 이미 출력했으므로 서버를 종료합니다.
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+    if (net_set_nonblock(listen_fd) &lt; 0) {
+        server_log_errno(&quot;fcntl listen nonblock&quot;, errno);
+        close(listen_fd);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
+    server_log(&quot;listening on %s:%d (fd %d)\n&quot;, cfg.host, cfg.port, listen_fd);
+
+    // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
+    g_worker_config = &amp;cfg;
+    struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
+                                      serve_connection);
+    if (workers == NULL) {
+        server_log_errno(&quot;pool_create&quot;, errno);
+        close(listen_fd);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
+    while (!g_stop) {
+        int ready = net_wait(listen_fd, POLLIN, 1000);
+        if (ready == 0) continue;
+        if (ready &lt; 0) {
+            if (errno == EINTR) continue;
+            server_log_errno(&quot;poll&quot;, errno);
+            continue;
+        }
+
+        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }
+
+        // macOS는 듣는 소켓의 비차단 설정을 물려주므로 연결 소켓을 차단 모드로 되돌립니다.
+        if (net_set_blocking(conn_fd) &lt; 0) {
+            server_log_errno(&quot;fcntl connection blocking&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        if (net_set_timeouts(conn_fd, cfg.timeout_sec) &lt; 0) {
+            server_log_errno(&quot;setsockopt timeout&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+
+#ifdef SO_NOSIGPIPE
+        // macOS 연결 소켓에 쓰기 중 SIGPIPE를 만들지 않도록 설정합니다.
+        int no_sigpipe = 1;
+        if (setsockopt(conn_fd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &amp;no_sigpipe, sizeof(no_sigpipe)) &lt; 0) {
+            server_log_errno(&quot;setsockopt SO_NOSIGPIPE&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+#endif
+
+        // 클라이언트 주소 구조체에 담긴 IPv4 주소를 사람이 읽는 문자열로 바꿉니다.
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, ip, sizeof(ip)) == NULL) {
+            // 주소 변환에 실패하면 이 연결 소켓을 닫고 다음 연결을 기다립니다.
+            server_log_errno(&quot;inet_ntop&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        // 새 연결 소켓 번호와 접속한 클라이언트 주소를 출력합니다.
+        server_log(&quot;accepted fd %d from %s:%d\n&quot;, conn_fd, ip,
+                   ntohs(peer.sin_port));
+
+        // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
+        if (pool_submit(workers, conn_fd) &lt; 0) {
+            server_log_errno(&quot;pool_submit&quot;, errno);
+            close(conn_fd);
+        }
+    }
+
+    close(listen_fd);
+    pool_shutdown(workers);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;
+}
+</code></pre></details></div></section><section><h2>공통 실행 컴포넌트 전체 목록</h2><p class="muted">세 브랜치를 비교했을 때 코드 변경 파일은 <code>src/main.c</code>뿐입니다. 아래 공통 모듈은 스레드 풀 기준 브랜치의 전체 구현이며 다른 두 모델에서 동일합니다. 각 접힌 파일에는 모든 소스와 함수 시작 행이 들어 있습니다.</p><div class="grid"><article class="component"><h3>src/config.c</h3><p>명령행 옵션을 struct config에 채웁니다.</p><span class="path">전체 행: 1–100</span><details class="file"><summary><b>src/config.c</b><span>src/config.c:1–100행 · 100행</span></summary><p>함수 정의 시작 행: <code>config_usage()</code> 9행 · <code>parse_number()</code> 17행 · <code>config_parse()</code> 37행 · <code>config()</code> 41행</p><pre><code>#include &quot;config.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;limits.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+
+void config_usage(const char *program) {
+    fprintf(stderr,
+            &quot;Usage: %s [-p port] [-r root] [-b backlog] [-w workers] &quot;
+            &quot;[-t seconds] [-c routes-file] [-f] [-h]\n&quot;,
+            program);
+}
+
+// 십진수 인자를 범위 검사 뒤 int 값으로 바꿉니다.
+static int parse_number(const char *text, int min, int max, int *out) {
+    if (text == NULL || *text == &#x27;\0&#x27;) {
+        return -1;
+    }
+    for (const char *p = text; *p != &#x27;\0&#x27;; p++) {
+        if (*p &lt; &#x27;0&#x27; || *p &gt; &#x27;9&#x27;) {
+            return -1;
+        }
+    }
+    errno = 0;
+    char *end = NULL;
+    long value = strtol(text, &amp;end, 10);
+    if (errno == ERANGE || end == text || *end != &#x27;\0&#x27; ||
+        value &lt; min || value &gt; max || value &gt; INT_MAX) {
+        return -1;
+    }
+    *out = (int)value;
+    return 0;
+}
+
+int config_parse(int argc, char **argv, struct config *cfg) {
+    if (cfg == NULL) {
+        return -1;
+    }
+    *cfg = (struct config){
+        .host = &quot;127.0.0.1&quot;,
+        .port = 8080,
+        .backlog = 128,
+        .root = &quot;./www&quot;,
+        .workers = 8,
+        .timeout_sec = 5,
+        .routes_path = NULL,
+        .forward_proxy = 0
+    };
+
+    opterr = 0;
+    int option;
+    while ((option = getopt(argc, argv, &quot;p:r:b:w:t:c:fh&quot;)) != -1) {
+        switch (option) {
+            case &#x27;p&#x27;:
+                if (parse_number(optarg, 1, 65535, &amp;cfg-&gt;port) &lt; 0) {
+                    fprintf(stderr, &quot;invalid port: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;r&#x27;: cfg-&gt;root = optarg; break;
+            case &#x27;b&#x27;:
+                if (parse_number(optarg, 1, INT_MAX, &amp;cfg-&gt;backlog) &lt; 0) {
+                    fprintf(stderr, &quot;invalid backlog: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;w&#x27;:
+                if (parse_number(optarg, 1, 256, &amp;cfg-&gt;workers) &lt; 0) {
+                    fprintf(stderr, &quot;invalid worker count: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;t&#x27;:
+                if (parse_number(optarg, 1, 3600, &amp;cfg-&gt;timeout_sec) &lt; 0) {
+                    fprintf(stderr, &quot;invalid timeout: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;c&#x27;: cfg-&gt;routes_path = optarg; break;
+            case &#x27;f&#x27;: cfg-&gt;forward_proxy = 1; break;
+            case &#x27;h&#x27;:
+                config_usage(argv[0]);
+                return 1;
+            default:
+                config_usage(argv[0]);
+                return -1;
+        }
+    }
+    if (optind != argc) {
+        config_usage(argv[0]);
+        return -1;
+    }
+    return 0;
+}
+</code></pre></details></article><article class="component"><h3>src/net.c</h3><p>listen 소켓, upstream 연결, poll 대기, timeout, 부분 전송 반복을 담당합니다.</p><span class="path">전체 행: 1–232</span><details class="file"><summary><b>src/net.c</b><span>src/net.c:1–232행 · 232행</span></summary><p>함수 정의 시작 행: <code>net_listen()</code> 17행 · <code>net_send_all()</code> 70행 · <code>net_set_timeouts()</code> 91행 · <code>net_set_nonblock()</code> 100행 · <code>net_set_blocking()</code> 106행 · <code>net_wait()</code> 112행 · <code>net_connect()</code> 122행</p><pre><code>#include &quot;net.h&quot;
+#include &quot;log.h&quot;
+
+#include &lt;arpa/inet.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;netdb.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;stdint.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;sys/time.h&gt;
+#include &lt;unistd.h&gt;
+
+int net_listen(const char *host, int port, int backlog) {
+    // 커널에 IPv4와 TCP 바이트 스트림을 사용하는 소켓 생성을 요청합니다.
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd &lt; 0) {
+        server_log_errno(&quot;socket&quot;, errno);
+        return -1;
+    }
+
+    // 서버를 다시 실행할 때 주소를 재사용할 수 있도록 소켓 옵션을 켭니다.
+    int on = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &amp;on, sizeof(on)) &lt; 0) {
+        server_log_errno(&quot;setsockopt&quot;, errno);
+        close(listen_fd);
+        return -1;
+    }
+
+    // bind()가 사용할 IPv4 주소와 포트를 담을 구조체를 준비합니다.
+    struct sockaddr_in addr;
+    memset(&amp;addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+
+    // host 문자열을 구조체가 사용할 IPv4 주소 값으로 바꿉니다.
+    int address_result = inet_pton(AF_INET, host, &amp;addr.sin_addr);
+    if (address_result != 1) {
+        if (address_result == 0) {
+            server_log(&quot;invalid IPv4 address: %s\n&quot;, host);
+        } else {
+            server_log_errno(&quot;inet_pton&quot;, errno);
+        }
+        close(listen_fd);
+        return -1;
+    }
+
+    // 커널에 listen_fd가 사용할 주소와 포트를 지정해 달라고 요청합니다.
+    if (bind(listen_fd, (struct sockaddr *)&amp;addr, sizeof(addr)) &lt; 0) {
+        server_log_errno(&quot;bind&quot;, errno);
+        close(listen_fd);
+        return -1;
+    }
+
+    // 커널에 이 소켓을 연결 요청 대기 상태로 바꾸고 대기 큐 크기를 설정하도록 요청합니다.
+    if (listen(listen_fd, backlog) &lt; 0) {
+        server_log_errno(&quot;listen&quot;, errno);
+        close(listen_fd);
+        return -1;
+    }
+
+    // 듣는 소켓 번호를 호출한 main()에 돌려줍니다.
+    return listen_fd;
+}
+
+// 지정한 바이트를 모두 보낼 때까지 send()를 반복합니다.
+int net_send_all(int fd, const void *buf, size_t len) {
+    const char *bytes = buf;
+    size_t sent = 0;
+
+    while (sent &lt; len) {
+        ssize_t n = send(fd, bytes + sent, len - sent, 0);
+        if (n &lt; 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (n == 0) {
+            // 전송량이 늘지 않으면 더 진행할 수 없다는 오류로 돌려줍니다.
+            errno = EPIPE;
+            return -1;
+        }
+        sent += (size_t)n;
+    }
+
+    return 0;
+}
+
+int net_set_timeouts(int fd, int seconds) {
+    struct timeval timeout = {.tv_sec = seconds, .tv_usec = 0};
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &amp;timeout, sizeof(timeout)) &lt; 0 ||
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &amp;timeout, sizeof(timeout)) &lt; 0) {
+        return -1;
+    }
+    return 0;
+}
+
+int net_set_nonblock(int fd) {
+    int flags = fcntl(fd, F_GETFL);
+    if (flags &lt; 0) return -1;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+int net_set_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL);
+    if (flags &lt; 0) return -1;
+    return fcntl(fd, F_SETFL, flags &amp; ~O_NONBLOCK);
+}
+
+int net_wait(int fd, short events, int timeout_ms) {
+    struct pollfd pfd = {.fd = fd, .events = events, .revents = 0};
+    int result = poll(&amp;pfd, 1, timeout_ms);
+    if (result &lt;= 0) return result;
+    if (pfd.revents &amp; (events | POLLHUP | POLLERR)) return 1;
+    errno = EBADF;
+    return -1;
+}
+
+// 한 업스트림 주소에 비차단 연결을 시도하고 결과를 제한 시간 안에 확인합니다.
+int net_connect(const char *host, const char *port, int timeout_ms) {
+    if (host == NULL || port == NULL || timeout_ms &lt;= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    struct addrinfo hints;
+    memset(&amp;hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    struct addrinfo *addresses = NULL;
+    int lookup = getaddrinfo(host, port, &amp;hints, &amp;addresses);
+    if (lookup != 0) {
+        errno = EHOSTUNREACH;
+        return -1;
+    }
+
+    int saved_error = ECONNREFUSED;
+    int connected_fd = -1;
+    for (struct addrinfo *address = addresses;
+         address != NULL; address = address-&gt;ai_next) {
+        int fd = socket(address-&gt;ai_family, address-&gt;ai_socktype,
+                        address-&gt;ai_protocol);
+        if (fd &lt; 0) {
+            saved_error = errno;
+            continue;
+        }
+        if (net_set_nonblock(fd) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        int result = connect(fd, address-&gt;ai_addr, address-&gt;ai_addrlen);
+        if (result &lt; 0 &amp;&amp; errno != EINPROGRESS &amp;&amp; errno != EWOULDBLOCK &amp;&amp;
+            errno != EALREADY &amp;&amp; errno != EINTR) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        if (result &lt; 0) {
+            int ready;
+            do {
+                ready = net_wait(fd, POLLOUT, timeout_ms);
+            } while (ready &lt; 0 &amp;&amp; errno == EINTR);
+            if (ready == 0) {
+                saved_error = ETIMEDOUT;
+                close(fd);
+                continue;
+            }
+            if (ready &lt; 0) {
+                saved_error = errno;
+                close(fd);
+                continue;
+            }
+
+            int socket_error = 0;
+            socklen_t error_len = sizeof(socket_error);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR,
+                           &amp;socket_error, &amp;error_len) &lt; 0) {
+                saved_error = errno;
+                close(fd);
+                continue;
+            }
+            if (socket_error != 0) {
+                saved_error = socket_error;
+                close(fd);
+                continue;
+            }
+        }
+
+        if (net_set_blocking(fd) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        struct timeval timeout = {
+            .tv_sec = timeout_ms / 1000,
+            .tv_usec = (timeout_ms % 1000) * 1000
+        };
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,
+                       &amp;timeout, sizeof(timeout)) &lt; 0 ||
+            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO,
+                       &amp;timeout, sizeof(timeout)) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+#ifdef SO_NOSIGPIPE
+        int no_sigpipe = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &amp;no_sigpipe, sizeof(no_sigpipe)) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+#endif
+
+        connected_fd = fd;
+        break;
+    }
+
+    freeaddrinfo(addresses);
+    if (connected_fd &lt; 0) errno = saved_error;
+    return connected_fd;
+}
+</code></pre></details></article><article class="component"><h3>src/conn.c</h3><p>한 클라이언트 연결의 recv·parse·dispatch·응답·keep-alive 상태 머신입니다.</p><span class="path">전체 행: 1–329</span><details class="file"><summary><b>src/conn.c</b><span>src/conn.c:1–329행 · 329행</span></summary><p>함수 정의 시작 행: <code>conn_state()</code> 18행 · <code>conn()</code> 29행 · <code>conn_state_name()</code> 42행 · <code>conn_set_state()</code> 56행 · <code>conn_has_header_end()</code> 63행 · <code>conn_error_status()</code> 72행 · <code>conn_handle()</code> 87행</p><pre><code>#include &quot;conn.h&quot;
+#include &quot;cgi.h&quot;
+#include &quot;http.h&quot;
+#include &quot;log.h&quot;
+#include &quot;net.h&quot;
+#include &quot;proxy.h&quot;
+#include &quot;response.h&quot;
+#include &quot;static.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;unistd.h&gt;
+
+// 이 값들은 TCP 상태가 아니라 서버 프로그램이 관리하는 처리 단계입니다.
+enum conn_state {
+    CONN_READING,
+    CONN_PARSING,
+    CONN_ROUTING,
+    CONN_RESPONDING,
+    CONN_KEEPALIVE_CHECK,
+    CONN_CLOSING,
+    CONN_CLOSED
+};
+
+// 연결 하나를 처리하는 동안 필요한 번호, 현재 단계, 요청 저장 공간입니다.
+struct conn {
+    int fd;
+    enum conn_state state;
+    char rbuf[8192];
+    size_t rlen;
+    size_t request_len;
+    int keep_alive;
+    int response_sent;
+    char *body;
+    size_t body_len;
+};
+
+// 상태 출력에 사용할 단계 이름을 돌려줍니다.
+static const char *conn_state_name(enum conn_state state) {
+    switch (state) {
+        case CONN_READING: return &quot;READING&quot;;
+        case CONN_PARSING: return &quot;PARSING&quot;;
+        case CONN_ROUTING: return &quot;ROUTING&quot;;
+        case CONN_RESPONDING: return &quot;RESPONDING&quot;;
+        case CONN_KEEPALIVE_CHECK: return &quot;KEEPALIVE_CHECK&quot;;
+        case CONN_CLOSING: return &quot;CLOSING&quot;;
+        case CONN_CLOSED: return &quot;CLOSED&quot;;
+    }
+    return &quot;UNKNOWN&quot;;
+}
+
+// 단계가 바뀌면 서버 터미널의 오류 출력(stderr)에 전환을 기록합니다.
+static void conn_set_state(struct conn *c, enum conn_state next) {
+    server_log(&quot;fd %d: %s -&gt; %s\n&quot;, c-&gt;fd,
+               conn_state_name(c-&gt;state), conn_state_name(next));
+    c-&gt;state = next;
+}
+
+// 요청 버퍼 안에서 CRLF 두 쌍을 길이 제한 안에 찾아냅니다.
+static int conn_has_header_end(const char *buffer, size_t length) {
+    if (length &lt; 4) return 0;
+    for (size_t i = 0; i &lt;= length - 4; i++) {
+        if (memcmp(buffer + i, &quot;\r\n\r\n&quot;, 4) == 0) return 1;
+    }
+    return 0;
+}
+
+// 파싱 실패 결과에 맞는 짧은 HTTP 오류 응답을 고릅니다.
+static int conn_error_status(enum http_result result) {
+    switch (result) {
+        case HTTP_BAD_REQUEST: return 400;
+        case HTTP_URI_TOO_LONG: return 414;
+        case HTTP_HEADER_TOO_LARGE: return 431;
+        case HTTP_NOT_IMPLEMENTED: return 501;
+        case HTTP_VERSION_NOT_SUPPORTED: return 505;
+        case HTTP_PAYLOAD_TOO_LARGE: return 413;
+        case HTTP_OK:
+        case HTTP_INCOMPLETE:
+            return 500;
+    }
+    return 500;
+}
+
+void conn_handle(int fd, const char *client_ip, const struct config *cfg) {
+    struct conn c = {
+        .fd = fd,
+        .state = CONN_READING,
+        .rlen = 0
+    };
+
+    // 현재 단계가 닫힘에 도달할 때까지 이 연결의 처리 단계를 진행합니다.
+    while (c.state != CONN_CLOSED) {
+        switch (c.state) {
+            case CONN_READING: {
+                // 앞 요청을 처리하고도 다음 요청 바이트가 남았는지 먼저 확인합니다.
+                if (conn_has_header_end(c.rbuf, c.rlen)) {
+                    server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                               c.fd, c.rlen);
+                    conn_set_state(&amp;c, CONN_PARSING);
+                    break;
+                }
+
+                // 아직 비어 있는 버퍼 영역의 크기를 구해 넘칠 공간이 없도록 합니다.
+                size_t available = sizeof(c.rbuf) - c.rlen - 1;
+                if (available == 0) {
+                    server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                               c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
+                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                if (n &lt; 0) {
+                    if (errno == EINTR) break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (c.rlen &gt; 0) {
+                            resp_send_error(c.fd, 408);
+                        }
+                        server_log(&quot;fd %d: request read timed out\n&quot;, c.fd);
+                    } else {
+                        server_log_errno(&quot;recv&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else if (n == 0) {
+                    server_log(&quot;fd %d: peer closed\n&quot;, c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else {
+                    // 이번에 읽은 바이트 수를 누적하고 문자열 끝을 표시합니다.
+                    c.rlen += (size_t)n;
+                    c.rbuf[c.rlen] = &#x27;\0&#x27;;
+
+                    // HTTP 헤더 끝의 빈 줄이 도착했을 때만 요청 읽기를 마칩니다.
+                    if (conn_has_header_end(c.rbuf, c.rlen)) {
+                        server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                                   c.fd, c.rlen);
+                        conn_set_state(&amp;c, CONN_PARSING);
+                    } else if (c.rlen == sizeof(c.rbuf) - 1) {
+                        // 용량을 다 썼는데 끝 표시가 없으면 버퍼를 더 쓰지 않고 연결을 닫습니다.
+                        server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                                   c.fd);
+                        conn_set_state(&amp;c, CONN_CLOSING);
+                    }
+                }
+                break;
+            }
+
+            case CONN_PARSING: {
+                // 원문 요청 줄을 검증하고 method, target, version 필드로 나눕니다.
+                struct http_request req;
+                enum http_result result = http_parse(c.rbuf, c.rlen, &amp;req);
+                server_log(&quot;fd %d: parse result %s\n&quot;, c.fd,
+                           http_result_name(result));
+                if (result == HTTP_OK) {
+                    c.request_len = req.header_len + (size_t)req.content_length;
+                    const char *connection = http_header_get(&amp;req, &quot;Connection&quot;);
+                    c.keep_alive = strcmp(req.version, &quot;HTTP/1.1&quot;) == 0;
+                    if (connection != NULL) {
+                        if (strcasecmp(connection, &quot;close&quot;) == 0) {
+                            c.keep_alive = 0;
+                        } else if (strcasecmp(connection, &quot;keep-alive&quot;) == 0) {
+                            c.keep_alive = 1;
+                        }
+                    }
+                    req.keep_alive = c.keep_alive;
+                    server_log(&quot;fd %d: request %s %s %s; headers=%d bytes=%zu\n&quot;,
+                               c.fd, req.method, req.target, req.version,
+                               req.nheaders, req.header_len);
+                    if (req.content_length &gt; 0) {
+                        size_t expected = (size_t)req.content_length;
+                        c.body = malloc(expected + 1);
+                        if (c.body == NULL) {
+                            server_log_errno(&quot;malloc request body&quot;, errno);
+                            conn_set_state(&amp;c, CONN_CLOSING);
+                            break;
+                        }
+
+                        // 헤더와 함께 이미 받은 본문 바이트를 새 저장 공간으로 옮깁니다.
+                        size_t received = c.rlen - req.header_len;
+                        if (received &gt; expected) {
+                            received = expected;
+                        }
+                        memcpy(c.body, c.rbuf + req.header_len, received);
+
+                        // Content-Length가 가리키는 나머지 바이트만 더 받습니다.
+                        while (received &lt; expected) {
+                            ssize_t n = recv(c.fd, c.body + received,
+                                             expected - received, 0);
+                            if (n &lt; 0) {
+                                if (errno == EINTR) continue;
+                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    resp_send_error(c.fd, 408);
+                                } else {
+                                    server_log_errno(&quot;recv body&quot;, errno);
+                                }
+                                free(c.body);
+                                c.body = NULL;
+                                conn_set_state(&amp;c, CONN_CLOSING);
+                                break;
+                            }
+                            if (n == 0) {
+                                server_log(&quot;fd %d: peer closed during request body\n&quot;,
+                                           c.fd);
+                                free(c.body);
+                                c.body = NULL;
+                                conn_set_state(&amp;c, CONN_CLOSING);
+                                break;
+                            }
+                            received += (size_t)n;
+                        }
+                        if (c.state == CONN_CLOSING) {
+                            break;
+                        }
+                        c.body[received] = &#x27;\0&#x27;;
+                        c.body_len = received;
+                        server_log(&quot;fd %d: request body bytes=%zu\n&quot;,
+                                   c.fd, received);
+                    }
+                    conn_set_state(&amp;c, CONN_ROUTING);
+                } else {
+                    if (resp_send_error(c.fd, conn_error_status(result)) &lt; 0) {
+                        server_log_errno(&quot;send error response&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                }
+                break;
+            }
+
+            case CONN_ROUTING: {
+                // 프록시 규칙이 먼저 맞는지 보고, 아니면 정적 파일이나 CGI로 보냅니다.
+                struct http_request req;
+                enum http_result parse_result = http_parse(c.rbuf, c.rlen, &amp;req);
+                if (parse_result != HTTP_OK) {
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+                req.keep_alive = c.keep_alive;
+                int serve_result = 0;
+                int proxy_handled = 0;
+                if (cfg-&gt;forward_proxy &amp;&amp;
+                    (strncmp(req.target, &quot;http://&quot;, 7) == 0 ||
+                     strncmp(req.target, &quot;https://&quot;, 8) == 0)) {
+                    serve_result = proxy_forward(c.fd, &amp;req, c.body,
+                                                 c.body_len, cfg-&gt;timeout_sec,
+                                                 client_ip);
+                    proxy_handled = 1;
+                } else {
+                    int reverse_result = proxy_reverse(c.fd, &amp;req, c.body,
+                                                       c.body_len, cfg,
+                                                       client_ip);
+                    if (reverse_result == PROXY_NO_ROUTE) {
+                        if (strncmp(req.target, &quot;/cgi-bin/&quot;, 9) == 0) {
+                            serve_result = cgi_serve(c.fd, cfg, &amp;req,
+                                                     c.body, c.body_len);
+                        } else {
+                            serve_result = static_serve(c.fd, cfg, &amp;req);
+                        }
+                    } else {
+                        serve_result = reverse_result == PROXY_FAILED ? -1 : 0;
+                        proxy_handled = 1;
+                    }
+                }
+                if (serve_result &lt; 0) {
+                    if (errno != EPIPE &amp;&amp; errno != ECONNRESET) {
+                        server_log_errno(&quot;static_serve&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+                c.response_sent = 1;
+                if (serve_result &gt; 0 || proxy_handled) c.keep_alive = 0;
+                conn_set_state(&amp;c, CONN_RESPONDING);
+                break;
+            }
+
+            case CONN_RESPONDING: {
+                if (c.response_sent) {
+                    conn_set_state(&amp;c, CONN_KEEPALIVE_CHECK);
+                    break;
+                }
+                static const char body[] = &quot;hello\n&quot;;
+                if (resp_send_simple(c.fd, 200, &quot;text/plain; charset=utf-8&quot;,
+                                     body, sizeof(body) - 1, c.keep_alive) &lt; 0) {
+                    if (errno != EPIPE &amp;&amp; errno != ECONNRESET) {
+                        server_log_errno(&quot;send&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+                conn_set_state(&amp;c, CONN_KEEPALIVE_CHECK);
+                break;
+            }
+
+            case CONN_KEEPALIVE_CHECK:
+                if (!c.keep_alive) {
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 방금 처리한 요청만 버리고, 다음 요청 바이트는 버퍼 앞으로 당깁니다.
+                if (c.request_len &gt; c.rlen) {
+                    c.request_len = c.rlen;
+                }
+                c.rlen -= c.request_len;
+                memmove(c.rbuf, c.rbuf + c.request_len, c.rlen);
+                c.rbuf[c.rlen] = &#x27;\0&#x27;;
+                free(c.body);
+                c.body = NULL;
+                c.body_len = 0;
+                c.response_sent = 0;
+                conn_set_state(&amp;c, CONN_READING);
+                break;
+
+            case CONN_CLOSING:
+                // 이 연결의 처리를 마치고 서버 프로세스의 fd를 커널에 반납합니다.
+                free(c.body);
+                c.body = NULL;
+                close(c.fd);
+                conn_set_state(&amp;c, CONN_CLOSED);
+                break;
+
+            case CONN_CLOSED:
+                break;
+        }
+    }
+}
+</code></pre></details></article><article class="component"><h3>src/http.c</h3><p>요청 줄·헤더·Content-Length를 해석하고 header lookup을 제공합니다.</p><span class="path">전체 행: 1–190</span><details class="file"><summary><b>src/http.c</b><span>src/http.c:1–190행 · 190행</span></summary><p>함수 정의 시작 행: <code>has_header_end()</code> 9행 · <code>http_result_name()</code> 20행 · <code>http_header_get()</code> 35행 · <code>http_parse()</code> 48행</p><pre><code>#include &quot;http.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+
+// 요청 버퍼에 CRLFCRLF가 모두 도착했는지 확인합니다.
+static int has_header_end(const char *buf, size_t len) {
+    for (size_t i = 0; i + 3 &lt; len; i++) {
+        if (buf[i] == &#x27;\r&#x27; &amp;&amp; buf[i + 1] == &#x27;\n&#x27; &amp;&amp;
+            buf[i + 2] == &#x27;\r&#x27; &amp;&amp; buf[i + 3] == &#x27;\n&#x27;) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// 결과 코드를 로그에서 읽을 이름으로 바꿉니다.
+const char *http_result_name(enum http_result result) {
+    switch (result) {
+        case HTTP_OK: return &quot;HTTP_OK&quot;;
+        case HTTP_INCOMPLETE: return &quot;HTTP_INCOMPLETE&quot;;
+        case HTTP_BAD_REQUEST: return &quot;HTTP_BAD_REQUEST&quot;;
+        case HTTP_URI_TOO_LONG: return &quot;HTTP_URI_TOO_LONG&quot;;
+        case HTTP_HEADER_TOO_LARGE: return &quot;HTTP_HEADER_TOO_LARGE&quot;;
+        case HTTP_NOT_IMPLEMENTED: return &quot;HTTP_NOT_IMPLEMENTED&quot;;
+        case HTTP_VERSION_NOT_SUPPORTED: return &quot;HTTP_VERSION_NOT_SUPPORTED&quot;;
+        case HTTP_PAYLOAD_TOO_LARGE: return &quot;HTTP_PAYLOAD_TOO_LARGE&quot;;
+    }
+    return &quot;HTTP_BAD_REQUEST&quot;;
+}
+
+// 헤더 이름은 대소문자를 구분하지 않으므로 이름으로 값을 찾습니다.
+const char *http_header_get(const struct http_request *req, const char *name) {
+    if (req == NULL || name == NULL) {
+        return NULL;
+    }
+    for (int i = 0; i &lt; req-&gt;nheaders; i++) {
+        if (strcasecmp(req-&gt;headers[i].name, name) == 0) {
+            return req-&gt;headers[i].value;
+        }
+    }
+    return NULL;
+}
+
+// 3-1 요청 줄에 이어 헤더 줄들을 배열에 담습니다.
+enum http_result http_parse(const char *buf, size_t len, struct http_request *req) {
+    if (buf == NULL || req == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (!has_header_end(buf, len)) {
+        return HTTP_INCOMPLETE;
+    }
+
+    // 요청 줄의 끝을 찾습니다. 입력 버퍼는 수정하지 않습니다.
+    size_t line_end = 0;
+    while (line_end + 1 &lt; len &amp;&amp;
+           !(buf[line_end] == &#x27;\r&#x27; &amp;&amp; buf[line_end + 1] == &#x27;\n&#x27;)) {
+        line_end++;
+    }
+    if (line_end + 1 &gt;= len) {
+        return HTTP_BAD_REQUEST;
+    }
+
+    // 요청 줄에는 method, target, version 사이의 공백이 정확히 두 개 있어야 합니다.
+    size_t first_space = line_end;
+    size_t second_space = line_end;
+    for (size_t i = 0; i &lt; line_end; i++) {
+        if (buf[i] == &#x27; &#x27;) {
+            if (first_space == line_end) {
+                first_space = i;
+            } else if (second_space == line_end) {
+                second_space = i;
+            } else {
+                return HTTP_BAD_REQUEST;
+            }
+        }
+    }
+    if (first_space == 0 || second_space == line_end ||
+        second_space == first_space + 1 || second_space + 1 == line_end) {
+        return HTTP_BAD_REQUEST;
+    }
+
+    size_t method_len = first_space;
+    size_t target_start = first_space + 1;
+    size_t target_len = second_space - target_start;
+    size_t version_start = second_space + 1;
+    size_t version_len = line_end - version_start;
+
+    if (target_len &gt;= sizeof(req-&gt;target)) {
+        return HTTP_URI_TOO_LONG;
+    }
+    if (!((method_len == 3 &amp;&amp; memcmp(buf, &quot;GET&quot;, 3) == 0) ||
+          (method_len == 4 &amp;&amp; memcmp(buf, &quot;POST&quot;, 4) == 0))) {
+        return HTTP_NOT_IMPLEMENTED;
+    }
+    if (!((version_len == 8 &amp;&amp; memcmp(buf + version_start, &quot;HTTP/1.1&quot;, 8) == 0) ||
+          (version_len == 8 &amp;&amp; memcmp(buf + version_start, &quot;HTTP/1.0&quot;, 8) == 0))) {
+        return HTTP_VERSION_NOT_SUPPORTED;
+    }
+
+    memset(req, 0, sizeof(*req));
+    memcpy(req-&gt;method, buf, method_len);
+    req-&gt;method[method_len] = &#x27;\0&#x27;;
+    memcpy(req-&gt;target, buf + target_start, target_len);
+    req-&gt;target[target_len] = &#x27;\0&#x27;;
+    memcpy(req-&gt;version, buf + version_start, version_len);
+    req-&gt;version[version_len] = &#x27;\0&#x27;;
+
+    // 요청 줄 다음부터 빈 줄 전까지 한 헤더씩 읽습니다.
+    size_t pos = line_end + 2;
+    while (pos + 1 &lt; len) {
+        size_t end = pos;
+        while (end + 1 &lt; len &amp;&amp; !(buf[end] == &#x27;\r&#x27; &amp;&amp; buf[end + 1] == &#x27;\n&#x27;)) {
+            end++;
+        }
+        if (end + 1 &gt;= len) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (end == pos) {
+            req-&gt;header_len = end + 2;
+            break;
+        }
+
+        size_t colon = pos;
+        while (colon &lt; end &amp;&amp; buf[colon] != &#x27;:&#x27;) {
+            colon++;
+        }
+        if (colon == pos || colon == end) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (req-&gt;nheaders &gt;= (int)(sizeof(req-&gt;headers) / sizeof(req-&gt;headers[0]))) {
+            return HTTP_HEADER_TOO_LARGE;
+        }
+
+        size_t name_len = colon - pos;
+        size_t value_start = colon + 1;
+        size_t value_end = end;
+        while (value_start &lt; value_end &amp;&amp;
+               (buf[value_start] == &#x27; &#x27; || buf[value_start] == &#x27;\t&#x27;)) {
+            value_start++;
+        }
+        while (value_end &gt; value_start &amp;&amp;
+               (buf[value_end - 1] == &#x27; &#x27; || buf[value_end - 1] == &#x27;\t&#x27;)) {
+            value_end--;
+        }
+        size_t value_len = value_end - value_start;
+        struct http_header *header = &amp;req-&gt;headers[req-&gt;nheaders];
+        if (name_len &gt;= sizeof(header-&gt;name) || value_len &gt;= sizeof(header-&gt;value)) {
+            return HTTP_HEADER_TOO_LARGE;
+        }
+        memcpy(header-&gt;name, buf + pos, name_len);
+        header-&gt;name[name_len] = &#x27;\0&#x27;;
+        memcpy(header-&gt;value, buf + value_start, value_len);
+        header-&gt;value[value_len] = &#x27;\0&#x27;;
+        req-&gt;nheaders++;
+        pos = end + 2;
+    }
+    if (req-&gt;header_len == 0) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (strcmp(req-&gt;version, &quot;HTTP/1.1&quot;) == 0 &amp;&amp;
+        http_header_get(req, &quot;Host&quot;) == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (http_header_get(req, &quot;Transfer-Encoding&quot;) != NULL) {
+        return HTTP_NOT_IMPLEMENTED;
+    }
+    const char *content_length = http_header_get(req, &quot;Content-Length&quot;);
+    if (content_length != NULL) {
+        for (const char *digit = content_length; *digit != &#x27;\0&#x27;; digit++) {
+            if (*digit &lt; &#x27;0&#x27; || *digit &gt; &#x27;9&#x27;) {
+                return HTTP_BAD_REQUEST;
+            }
+        }
+        errno = 0;
+        char *number_end = NULL;
+        long body_length = strtol(content_length, &amp;number_end, 10);
+        if (errno == ERANGE || number_end == content_length ||
+            *number_end != &#x27;\0&#x27; || body_length &lt; 0) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (body_length &gt; HTTP_MAX_BODY) {
+            return HTTP_PAYLOAD_TOO_LARGE;
+        }
+        req-&gt;content_length = body_length;
+    }
+    return HTTP_OK;
+}
+</code></pre></details></article><article class="component"><h3>src/response.c</h3><p>HTTP 오류 응답을 조립합니다.</p><span class="path">전체 행: 1–74</span><details class="file"><summary><b>src/response.c</b><span>src/response.c:1–74행 · 74행</span></summary><p>함수 정의 시작 행: <code>resp_reason()</code> 9행 · <code>resp_send_head()</code> 29행 · <code>resp_send_simple()</code> 57행 · <code>resp_send_error()</code> 66행</p><pre><code>#include &quot;response.h&quot;
+
+#include &quot;net.h&quot;
+
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;time.h&gt;
+
+const char *resp_reason(int status) {
+    switch (status) {
+        case 200: return &quot;OK&quot;;
+        case 400: return &quot;Bad Request&quot;;
+        case 403: return &quot;Forbidden&quot;;
+        case 404: return &quot;Not Found&quot;;
+        case 405: return &quot;Method Not Allowed&quot;;
+        case 408: return &quot;Request Timeout&quot;;
+        case 413: return &quot;Payload Too Large&quot;;
+        case 414: return &quot;URI Too Long&quot;;
+        case 431: return &quot;Request Header Fields Too Large&quot;;
+        case 500: return &quot;Internal Server Error&quot;;
+        case 501: return &quot;Not Implemented&quot;;
+        case 502: return &quot;Bad Gateway&quot;;
+        case 504: return &quot;Gateway Timeout&quot;;
+        case 505: return &quot;HTTP Version Not Supported&quot;;
+        default: return &quot;Internal Server Error&quot;;
+    }
+}
+
+int resp_send_head(int fd, int status, const char *content_type,
+                   long content_length, int keep_alive) {
+    char date[64] = &quot;Thu, 01 Jan 1970 00:00:00 GMT&quot;;
+    time_t now = time(NULL);
+    struct tm utc;
+    if (now != (time_t)-1 &amp;&amp; gmtime_r(&amp;now, &amp;utc) != NULL) {
+        strftime(date, sizeof(date), &quot;%a, %d %b %Y %H:%M:%S GMT&quot;, &amp;utc);
+    }
+
+    char header[1024];
+    int length = snprintf(header, sizeof(header),
+                          &quot;HTTP/1.1 %d %s\r\n&quot;
+                          &quot;Content-Type: %s\r\n&quot;
+                          &quot;Content-Length: %ld\r\n&quot;
+                          &quot;Connection: %s\r\n&quot;
+                          &quot;Date: %s\r\n&quot;
+                          &quot;Server: c-webserver-proxy/1.0\r\n\r\n&quot;,
+                          status, resp_reason(status),
+                          content_type != NULL ? content_type : &quot;application/octet-stream&quot;,
+                          content_length, keep_alive ? &quot;keep-alive&quot; : &quot;close&quot;, date);
+    if (length &lt; 0 || (size_t)length &gt;= sizeof(header)) {
+        static const char fallback[] =
+            &quot;HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n&quot;;
+        return net_send_all(fd, fallback, sizeof(fallback) - 1);
+    }
+    return net_send_all(fd, header, (size_t)length);
+}
+
+int resp_send_simple(int fd, int status, const char *content_type,
+                     const char *body, size_t len, int keep_alive) {
+    if (len &gt; 0 &amp;&amp; body == NULL) return -1;
+    if (resp_send_head(fd, status, content_type, (long)len, keep_alive) &lt; 0) {
+        return -1;
+    }
+    return len &gt; 0 ? net_send_all(fd, body, len) : 0;
+}
+
+int resp_send_error(int fd, int status) {
+    char body[256];
+    int length = snprintf(body, sizeof(body),
+                          &quot;&lt;!doctype html&gt;&lt;html&gt;&lt;body&gt;&lt;h1&gt;%d %s&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;\n&quot;,
+                          status, resp_reason(status));
+    if (length &lt; 0 || (size_t)length &gt;= sizeof(body)) return -1;
+    return resp_send_simple(fd, status, &quot;text/html; charset=utf-8&quot;,
+                            body, (size_t)length, 0);
+}
+</code></pre></details></article><article class="component"><h3>src/mime.c</h3><p>파일 확장자에서 MIME Content-Type을 결정합니다.</p><span class="path">전체 행: 1–38</span><details class="file"><summary><b>src/mime.c</b><span>src/mime.c:1–38행 · 38행</span></summary><p>함수 정의 시작 행: <code>mime_from_path()</code> 6행</p><pre><code>#include &quot;mime.h&quot;
+
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+
+const char *mime_from_path(const char *path) {
+    if (path == NULL) return &quot;application/octet-stream&quot;;
+
+    const char *base = strrchr(path, &#x27;/&#x27;);
+    base = base != NULL ? base + 1 : path;
+    const char *dot = strrchr(base, &#x27;.&#x27;);
+    if (dot == NULL || dot == base || dot[1] == &#x27;\0&#x27;) {
+        return &quot;application/octet-stream&quot;;
+    }
+
+    const char *ext = dot + 1;
+    if (strcasecmp(ext, &quot;html&quot;) == 0 || strcasecmp(ext, &quot;htm&quot;) == 0)
+        return &quot;text/html; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;css&quot;) == 0)
+        return &quot;text/css; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;js&quot;) == 0)
+        return &quot;application/javascript; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;json&quot;) == 0)
+        return &quot;application/json; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;txt&quot;) == 0)
+        return &quot;text/plain; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;svg&quot;) == 0)
+        return &quot;image/svg+xml; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;png&quot;) == 0)
+        return &quot;image/png&quot;;
+    if (strcasecmp(ext, &quot;jpg&quot;) == 0 || strcasecmp(ext, &quot;jpeg&quot;) == 0)
+        return &quot;image/jpeg&quot;;
+    if (strcasecmp(ext, &quot;gif&quot;) == 0)
+        return &quot;image/gif&quot;;
+    if (strcasecmp(ext, &quot;ico&quot;) == 0)
+        return &quot;image/x-icon&quot;;
+    return &quot;application/octet-stream&quot;;
+}
+</code></pre></details></article><article class="component"><h3>src/static.c</h3><p>요청 경로 디코딩·루트 경계 검사·정적 파일 전송을 담당합니다.</p><span class="path">전체 행: 1–151</span><details class="file"><summary><b>src/static.c</b><span>src/static.c:1–151행 · 151행</span></summary><p>함수 정의 시작 행: <code>hex_value()</code> 19행 · <code>send_error_result()</code> 26행 · <code>decode_target()</code> 31행 · <code>path_is_inside()</code> 66행 · <code>static_serve()</code> 72행</p><pre><code>#define _DARWIN_C_SOURCE
+#define _XOPEN_SOURCE 700
+
+#include &quot;static.h&quot;
+
+#include &quot;mime.h&quot;
+#include &quot;net.h&quot;
+#include &quot;response.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;limits.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;unistd.h&gt;
+
+static int hex_value(char ch) {
+    if (ch &gt;= &#x27;0&#x27; &amp;&amp; ch &lt;= &#x27;9&#x27;) return ch - &#x27;0&#x27;;
+    if (ch &gt;= &#x27;a&#x27; &amp;&amp; ch &lt;= &#x27;f&#x27;) return ch - &#x27;a&#x27; + 10;
+    if (ch &gt;= &#x27;A&#x27; &amp;&amp; ch &lt;= &#x27;F&#x27;) return ch - &#x27;A&#x27; + 10;
+    return -1;
+}
+
+static int send_error_result(int fd, int status) {
+    return resp_send_error(fd, status) &lt; 0 ? -1 : 1;
+}
+
+// 경로의 %XX를 해독하고, 루트 이탈 조각이나 NUL 바이트를 거부합니다.
+static int decode_target(const char *target, char *path, size_t capacity) {
+    const char *query = strchr(target, &#x27;?&#x27;);
+    size_t input_len = query != NULL ? (size_t)(query - target) : strlen(target);
+    if (input_len == 0 || target[0] != &#x27;/&#x27;) return 400;
+
+    size_t out = 0;
+    for (size_t i = 0; i &lt; input_len; i++) {
+        unsigned char value = (unsigned char)target[i];
+        if (target[i] == &#x27;%&#x27;) {
+            if (i + 2 &gt;= input_len) return 400;
+            int hi = hex_value(target[i + 1]);
+            int lo = hex_value(target[i + 2]);
+            if (hi &lt; 0 || lo &lt; 0) return 400;
+            value = (unsigned char)((hi &lt;&lt; 4) | lo);
+            i += 2;
+            if (value == 0) return 400;
+        }
+        if (out + 1 &gt;= capacity) return 414;
+        path[out++] = (char)value;
+    }
+    path[out] = &#x27;\0&#x27;;
+
+    // 인코딩을 푼 다음 각 경로 조각이 정확히 &quot;..&quot;인지 검사합니다.
+    const char *part = path;
+    while (*part != &#x27;\0&#x27;) {
+        while (*part == &#x27;/&#x27;) part++;
+        const char *end = strchr(part, &#x27;/&#x27;);
+        size_t length = end != NULL ? (size_t)(end - part) : strlen(part);
+        if (length == 2 &amp;&amp; part[0] == &#x27;.&#x27; &amp;&amp; part[1] == &#x27;.&#x27;) return 403;
+        if (end == NULL) break;
+        part = end + 1;
+    }
+    return 0;
+}
+
+static int path_is_inside(const char *root, const char *file) {
+    size_t root_len = strlen(root);
+    if (strncmp(root, file, root_len) != 0) return 0;
+    return file[root_len] == &#x27;\0&#x27; || file[root_len] == &#x27;/&#x27;;
+}
+
+int static_serve(int fd, const struct config *cfg, const struct http_request *req) {
+    if (strcmp(req-&gt;method, &quot;GET&quot;) != 0) return send_error_result(fd, 405);
+
+    char decoded[PATH_MAX];
+    int decode_result = decode_target(req-&gt;target, decoded, sizeof(decoded));
+    if (decode_result != 0) return send_error_result(fd, decode_result);
+
+    size_t path_len = strlen(decoded);
+    if (path_len &gt; 0 &amp;&amp; decoded[path_len - 1] == &#x27;/&#x27;) {
+        static const char index_name[] = &quot;index.html&quot;;
+        if (path_len + sizeof(index_name) &gt; sizeof(decoded)) {
+            return send_error_result(fd, 414);
+        }
+        memcpy(decoded + path_len, index_name, sizeof(index_name));
+    }
+
+    char root[PATH_MAX];
+    if (realpath(cfg-&gt;root, root) == NULL) {
+        return send_error_result(fd, 500);
+    }
+    char candidate[PATH_MAX];
+    int candidate_len = snprintf(candidate, sizeof(candidate), &quot;%s/%s&quot;,
+                                 root, decoded[0] == &#x27;/&#x27; ? decoded + 1 : decoded);
+    if (candidate_len &lt; 0 || (size_t)candidate_len &gt;= sizeof(candidate)) {
+        return send_error_result(fd, 414);
+    }
+
+    char file_path[PATH_MAX];
+    if (realpath(candidate, file_path) == NULL) {
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        if (errno == EACCES) return send_error_result(fd, 403);
+        return send_error_result(fd, 500);
+    }
+    if (!path_is_inside(root, file_path)) return send_error_result(fd, 403);
+
+    struct stat file_stat;
+    if (stat(file_path, &amp;file_stat) &lt; 0) {
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        if (errno == EACCES) return send_error_result(fd, 403);
+        return send_error_result(fd, 500);
+    }
+    if (!S_ISREG(file_stat.st_mode) || file_stat.st_size &lt; 0 || file_stat.st_size &gt; LONG_MAX) {
+        return send_error_result(fd, 403);
+    }
+
+    int file_fd = open(file_path, O_RDONLY);
+    if (file_fd &lt; 0) {
+        if (errno == EACCES) return send_error_result(fd, 403);
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        return send_error_result(fd, 500);
+    }
+    if (fstat(file_fd, &amp;file_stat) &lt; 0 || !S_ISREG(file_stat.st_mode)) {
+        close(file_fd);
+        return send_error_result(fd, 403);
+    }
+
+    if (resp_send_head(fd, 200, mime_from_path(file_path),
+                       (long)file_stat.st_size, req-&gt;keep_alive) &lt; 0) {
+        close(file_fd);
+        return -1;
+    }
+
+    char buffer[16384];
+    int result = 0;
+    for (;;) {
+        ssize_t n = read(file_fd, buffer, sizeof(buffer));
+        if (n &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (n &lt; 0) {
+            result = -1;
+            break;
+        }
+        if (n == 0) break;
+        if (net_send_all(fd, buffer, (size_t)n) &lt; 0) {
+            result = -1;
+            break;
+        }
+    }
+    close(file_fd);
+    return result;
+}
+</code></pre></details></article><article class="component"><h3>src/cgi.c</h3><p>CGI 환경을 만들고 pipe/fork/exec 및 입출력 중계를 수행합니다.</p><span class="path">전체 행: 1–266</span><details class="file"><summary><b>src/cgi.c</b><span>src/cgi.c:1–266행 · 266행</span></summary><p>함수 정의 시작 행: <code>cgi_error()</code> 24행 · <code>cgi_hex()</code> 28행 · <code>cgi_decode_path()</code> 35행 · <code>path_inside()</code> 68행 · <code>write_all()</code> 74행 · <code>find_header_end()</code> 85행 · <code>cgi_serve()</code> 95행</p><pre><code>#define _DARWIN_C_SOURCE
+#define _XOPEN_SOURCE 700
+
+#include &quot;cgi.h&quot;
+
+#include &quot;net.h&quot;
+#include &quot;response.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/wait.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;limits.h&gt;
+
+#define CGI_OUTPUT_LIMIT 1048576
+
+static int cgi_error(int fd, int status) {
+    return resp_send_error(fd, status) &lt; 0 ? -1 : 1;
+}
+
+static int cgi_hex(char ch) {
+    if (ch &gt;= &#x27;0&#x27; &amp;&amp; ch &lt;= &#x27;9&#x27;) return ch - &#x27;0&#x27;;
+    if (ch &gt;= &#x27;a&#x27; &amp;&amp; ch &lt;= &#x27;f&#x27;) return ch - &#x27;a&#x27; + 10;
+    if (ch &gt;= &#x27;A&#x27; &amp;&amp; ch &lt;= &#x27;F&#x27;) return ch - &#x27;A&#x27; + 10;
+    return -1;
+}
+
+static int cgi_decode_path(const char *target, char *path, size_t cap,
+                           const char **query_out) {
+    const char *query = strchr(target, &#x27;?&#x27;);
+    size_t len = query != NULL ? (size_t)(query - target) : strlen(target);
+    if (query_out != NULL) *query_out = query != NULL ? query + 1 : &quot;&quot;;
+    if (len == 0 || target[0] != &#x27;/&#x27;) return 400;
+    size_t out = 0;
+    for (size_t i = 0; i &lt; len; i++) {
+        unsigned char ch = (unsigned char)target[i];
+        if (target[i] == &#x27;%&#x27;) {
+            if (i + 2 &gt;= len) return 400;
+            int hi = cgi_hex(target[i + 1]);
+            int lo = cgi_hex(target[i + 2]);
+            if (hi &lt; 0 || lo &lt; 0) return 400;
+            ch = (unsigned char)((hi &lt;&lt; 4) | lo);
+            i += 2;
+            if (ch == 0) return 400;
+        }
+        if (out + 1 &gt;= cap) return 414;
+        path[out++] = (char)ch;
+    }
+    path[out] = &#x27;\0&#x27;;
+    for (const char *part = path; *part != &#x27;\0&#x27;;) {
+        while (*part == &#x27;/&#x27;) part++;
+        const char *end = strchr(part, &#x27;/&#x27;);
+        size_t part_len = end != NULL ? (size_t)(end - part) : strlen(part);
+        if (part_len == 2 &amp;&amp; part[0] == &#x27;.&#x27; &amp;&amp; part[1] == &#x27;.&#x27;) return 403;
+        if (end == NULL) break;
+        part = end + 1;
+    }
+    return 0;
+}
+
+static int path_inside(const char *root, const char *file) {
+    size_t n = strlen(root);
+    return strncmp(root, file, n) == 0 &amp;&amp;
+           (file[n] == &#x27;\0&#x27; || file[n] == &#x27;/&#x27;);
+}
+
+static int write_all(int fd, const char *buf, size_t len) {
+    size_t done = 0;
+    while (done &lt; len) {
+        ssize_t n = write(fd, buf + done, len - done);
+        if (n &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (n &lt;= 0) return -1;
+        done += (size_t)n;
+    }
+    return 0;
+}
+
+static int find_header_end(const char *buf, size_t len, size_t *end_out) {
+    for (size_t i = 0; i + 3 &lt; len; i++) {
+        if (memcmp(buf + i, &quot;\r\n\r\n&quot;, 4) == 0) {
+            *end_out = i + 4;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int cgi_serve(int fd, const struct config *cfg, const struct http_request *req,
+              const char *body, size_t body_len) {
+    if (strcmp(req-&gt;method, &quot;GET&quot;) != 0 &amp;&amp; strcmp(req-&gt;method, &quot;POST&quot;) != 0)
+        return cgi_error(fd, 405);
+
+    char decoded[PATH_MAX];
+    const char *query = &quot;&quot;;
+    int path_result = cgi_decode_path(req-&gt;target, decoded, sizeof(decoded), &amp;query);
+    if (path_result != 0) return cgi_error(fd, path_result);
+
+    char root[PATH_MAX];
+    if (realpath(cfg-&gt;root, root) == NULL) return cgi_error(fd, 500);
+    char candidate[PATH_MAX];
+    int n = snprintf(candidate, sizeof(candidate), &quot;%s/%s&quot;, root, decoded + 1);
+    if (n &lt; 0 || (size_t)n &gt;= sizeof(candidate)) return cgi_error(fd, 414);
+    char script[PATH_MAX];
+    if (realpath(candidate, script) == NULL) {
+        if (errno == ENOENT) return cgi_error(fd, 404);
+        if (errno == EACCES) return cgi_error(fd, 403);
+        return cgi_error(fd, 500);
+    }
+    if (!path_inside(root, script)) return cgi_error(fd, 403);
+    struct stat st;
+    if (stat(script, &amp;st) &lt; 0) {
+        if (errno == EACCES) return cgi_error(fd, 403);
+        if (errno == ENOENT) return cgi_error(fd, 404);
+        return cgi_error(fd, 500);
+    }
+    if (!S_ISREG(st.st_mode) || access(script, X_OK) &lt; 0)
+        return cgi_error(fd, 403);
+
+    int input_pipe[2];
+    int output_pipe[2];
+
+    // fork() 전에 CGI 환경 문자열을 준비합니다.
+    // 여러 스레드에서 호출해도 자식이 fork() 뒤에 snprintf()를 실행하지 않게 합니다.
+    char content_length[32];
+    int content_length_result = snprintf(content_length, sizeof(content_length), &quot;%zu&quot;, body_len);
+    const char *request_content_type = http_header_get(req, &quot;Content-Type&quot;);
+    char env_method[64], env_query[4096], env_length[64], env_type[1200];
+    char env_script[PATH_MAX + 32], env_protocol[32];
+    int env_results[] = {
+        snprintf(env_method, sizeof(env_method), &quot;REQUEST_METHOD=%s&quot;, req-&gt;method),
+        snprintf(env_query, sizeof(env_query), &quot;QUERY_STRING=%s&quot;, query),
+        snprintf(env_length, sizeof(env_length), &quot;CONTENT_LENGTH=%s&quot;, content_length),
+        snprintf(env_type, sizeof(env_type), &quot;CONTENT_TYPE=%s&quot;,
+                 request_content_type != NULL ? request_content_type : &quot;&quot;),
+        snprintf(env_script, sizeof(env_script), &quot;SCRIPT_NAME=%s&quot;, decoded),
+        snprintf(env_protocol, sizeof(env_protocol), &quot;SERVER_PROTOCOL=%s&quot;, req-&gt;version)
+    };
+    size_t env_capacities[] = {
+        sizeof(env_method), sizeof(env_query), sizeof(env_length), sizeof(env_type),
+        sizeof(env_script), sizeof(env_protocol)
+    };
+    if (content_length_result &lt; 0 || (size_t)content_length_result &gt;= sizeof(content_length)) {
+        return cgi_error(fd, 500);
+    }
+    for (size_t i = 0; i &lt; sizeof(env_results) / sizeof(env_results[0]); i++) {
+        if (env_results[i] &lt; 0 || (size_t)env_results[i] &gt;= env_capacities[i]) {
+            return cgi_error(fd, 500);
+        }
+    }
+    char *envp[] = {env_method, env_query, env_length, env_type, env_script,
+                    env_protocol, &quot;GATEWAY_INTERFACE=CGI/1.1&quot;,
+                    &quot;PATH=/usr/bin:/bin&quot;, NULL};
+
+    if (pipe(input_pipe) &lt; 0) return cgi_error(fd, 500);
+    if (pipe(output_pipe) &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+
+    pid_t pid = fork();
+    if (pid &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+    if (pid == 0) {
+        if (dup2(input_pipe[0], STDIN_FILENO) &lt; 0 ||
+            dup2(output_pipe[1], STDOUT_FILENO) &lt; 0) _exit(127);
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+
+        char *argv[] = {script, NULL};
+        execve(script, argv, envp);
+        _exit(127);
+    }
+
+    close(input_pipe[0]);
+    close(output_pipe[1]);
+    if (body_len &gt; 0 &amp;&amp; write_all(input_pipe[1], body, body_len) &lt; 0) {
+        close(input_pipe[1]); close(output_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return cgi_error(fd, 500);
+    }
+    close(input_pipe[1]);
+
+    char *output = malloc(CGI_OUTPUT_LIMIT + 1);
+    if (output == NULL) {
+        close(output_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return cgi_error(fd, 500);
+    }
+    size_t output_len = 0;
+    int timed_out = 0;
+    int too_large = 0;
+    for (;;) {
+        int ready = net_wait(output_pipe[0], POLLIN, cfg-&gt;timeout_sec * 1000);
+        if (ready == 0) { timed_out = 1; break; }
+        if (ready &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (ready &lt; 0) break;
+        ssize_t got = read(output_pipe[0], output + output_len,
+                           CGI_OUTPUT_LIMIT - output_len);
+        if (got &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (got &lt; 0) break;
+        if (got == 0) break;
+        output_len += (size_t)got;
+        if (output_len == CGI_OUTPUT_LIMIT) {
+            char extra;
+            ssize_t more = read(output_pipe[0], &amp;extra, 1);
+            if (more &gt; 0) too_large = 1;
+            break;
+        }
+    }
+    close(output_pipe[0]);
+    if (timed_out || too_large) kill(pid, SIGKILL);
+    int child_status = 0;
+    while (waitpid(pid, &amp;child_status, 0) &lt; 0) {
+        if (errno != EINTR) { free(output); return cgi_error(fd, 500); }
+    }
+    if (timed_out) { free(output); return cgi_error(fd, 504); }
+    if (too_large || !WIFEXITED(child_status) || WEXITSTATUS(child_status) != 0) {
+        free(output);
+        return cgi_error(fd, 500);
+    }
+
+    size_t header_end = 0;
+    if (!find_header_end(output, output_len, &amp;header_end)) {
+        free(output);
+        return cgi_error(fd, 500);
+    }
+    char content_type[256] = &quot;text/plain; charset=utf-8&quot;;
+    size_t line = 0;
+    while (line + 1 &lt; header_end) {
+        size_t end = line;
+        while (end + 1 &lt; header_end &amp;&amp;
+               !(output[end] == &#x27;\r&#x27; &amp;&amp; output[end + 1] == &#x27;\n&#x27;)) end++;
+        if (end == line) break;
+        const char *colon = memchr(output + line, &#x27;:&#x27;, end - line);
+        if (colon != NULL) {
+            size_t name_len = (size_t)(colon - (output + line));
+            if (name_len == 12 &amp;&amp; strncasecmp(output + line, &quot;Content-Type&quot;, 12) == 0) {
+                size_t value = (size_t)(colon - output) + 1;
+                while (value &lt; end &amp;&amp; (output[value] == &#x27; &#x27; || output[value] == &#x27;\t&#x27;)) value++;
+                size_t value_len = end - value;
+                if (value_len &gt;= sizeof(content_type)) value_len = sizeof(content_type) - 1;
+                memcpy(content_type, output + value, value_len);
+                content_type[value_len] = &#x27;\0&#x27;;
+            }
+        }
+        line = end + 2;
+    }
+    size_t body_start = header_end;
+    int send_result = resp_send_simple(fd, 200, content_type,
+                                       output + body_start, output_len - body_start,
+                                       req-&gt;keep_alive);
+    free(output);
+    return send_result &lt; 0 ? -1 : 0;
+}
+</code></pre></details></article><article class="component"><h3>src/route.c</h3><p>라우팅 규칙을 읽고 host/path 매칭 후 backend를 선택합니다.</p><span class="path">전체 행: 1–212</span><details class="file"><summary><b>src/route.c</b><span>src/route.c:1–212행 · 212행</span></summary><p>함수 정의 시작 행: <code>valid_port()</code> 14행 · <code>parse_backend()</code> 24행 · <code>destroy_loaded()</code> 56행 · <code>route_load()</code> 66행 · <code>host_matches()</code> 150행 · <code>route_match()</code> 172행 · <code>route_pick()</code> 199행 · <code>route_destroy()</code> 209행</p><pre><code>#include &quot;route.h&quot;
+
+#include &lt;ctype.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;limits.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+
+#define ROUTE_LINE_CAP 4096
+
+// 1부터 65535까지의 숫자만 포트 문자열로 받아들입니다.
+static int valid_port(const char *port) {
+    if (port == NULL || *port == &#x27;\0&#x27;) return 0;
+    char *end = NULL;
+    errno = 0;
+    long value = strtol(port, &amp;end, 10);
+    return errno != ERANGE &amp;&amp; end != port &amp;&amp; *end == &#x27;\0&#x27; &amp;&amp;
+           value &gt;= 1 &amp;&amp; value &lt;= 65535;
+}
+
+// host:port 또는 [IPv6]:port를 고정 크기 필드에 나눠 담습니다.
+static int parse_backend(const char *text, struct backend *backend) {
+    const char *host_start = text;
+    const char *host_end = NULL;
+    const char *port_start = NULL;
+
+    if (text[0] == &#x27;[&#x27;) {
+        host_start++;
+        host_end = strchr(host_start, &#x27;]&#x27;);
+        if (host_end == NULL || host_end[1] != &#x27;:&#x27;) return -1;
+        port_start = host_end + 2;
+    } else {
+        const char *colon = strrchr(text, &#x27;:&#x27;);
+        if (colon == NULL || colon == text) return -1;
+        host_end = colon;
+        port_start = colon + 1;
+    }
+
+    size_t host_len = (size_t)(host_end - host_start);
+    size_t port_len = strlen(port_start);
+    if (host_len == 0 || host_len &gt;= sizeof(backend-&gt;host) ||
+        port_len == 0 || port_len &gt;= sizeof(backend-&gt;port) ||
+        !valid_port(port_start)) {
+        return -1;
+    }
+
+    memcpy(backend-&gt;host, host_start, host_len);
+    backend-&gt;host[host_len] = &#x27;\0&#x27;;
+    memcpy(backend-&gt;port, port_start, port_len + 1);
+    return 0;
+}
+
+// 실패한 로딩에서 이미 만든 mutex와 파일을 정리합니다.
+static void destroy_loaded(struct route *routes, int count) {
+    for (int i = 0; i &lt; count; i++) {
+        if (routes[i].mutex_ready) {
+            pthread_mutex_destroy(&amp;routes[i].mutex);
+            routes[i].mutex_ready = 0;
+        }
+    }
+}
+
+// 각 줄을 호스트, 경로 접두사, 백엔드 목록으로 해석합니다.
+int route_load(const char *path, struct route *routes, int max) {
+    if (path == NULL || routes == NULL || max &lt;= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    FILE *file = fopen(path, &quot;r&quot;);
+    if (file == NULL) return -1;
+
+    char line[ROUTE_LINE_CAP];
+    int count = 0;
+    int failed = 0;
+    while (fgets(line, sizeof(line), file) != NULL) {
+        size_t length = strlen(line);
+        if (length &gt; 0 &amp;&amp; line[length - 1] != &#x27;\n&#x27; &amp;&amp; !feof(file)) {
+            failed = 1;
+            errno = EOVERFLOW;
+            break;
+        }
+        if (length &gt; 0 &amp;&amp; line[length - 1] == &#x27;\n&#x27;) line[--length] = &#x27;\0&#x27;;
+        if (length &gt; 0 &amp;&amp; line[length - 1] == &#x27;\r&#x27;) line[--length] = &#x27;\0&#x27;;
+
+        char *cursor = line;
+        while (isspace((unsigned char)*cursor)) cursor++;
+        if (*cursor == &#x27;\0&#x27; || *cursor == &#x27;#&#x27;) continue;
+        if (count &gt;= max) {
+            failed = 1;
+            errno = EOVERFLOW;
+            break;
+        }
+
+        struct route *route = &amp;routes[count];
+        memset(route, 0, sizeof(*route));
+        char *save = NULL;
+        char *host = strtok_r(cursor, &quot; \t&quot;, &amp;save);
+        char *prefix = strtok_r(NULL, &quot; \t&quot;, &amp;save);
+        if (host == NULL || prefix == NULL || prefix[0] != &#x27;/&#x27; ||
+            strlen(host) &gt;= sizeof(route-&gt;host) ||
+            strlen(prefix) &gt;= sizeof(route-&gt;prefix)) {
+            failed = 1;
+            errno = EINVAL;
+            break;
+        }
+        strcpy(route-&gt;host, host);
+        strcpy(route-&gt;prefix, prefix);
+
+        char *backend_text;
+        while ((backend_text = strtok_r(NULL, &quot; \t&quot;, &amp;save)) != NULL) {
+            if (route-&gt;nbackends &gt;= ROUTE_BACKEND_MAX ||
+                parse_backend(backend_text,
+                              &amp;route-&gt;backends[route-&gt;nbackends]) &lt; 0) {
+                failed = 1;
+                errno = EINVAL;
+                break;
+            }
+            route-&gt;nbackends++;
+        }
+        if (failed) break;
+        if (route-&gt;nbackends == 0) {
+            failed = 1;
+            errno = EINVAL;
+            break;
+        }
+
+        int result = pthread_mutex_init(&amp;route-&gt;mutex, NULL);
+        if (result != 0) {
+            failed = 1;
+            errno = result;
+            break;
+        }
+        route-&gt;mutex_ready = 1;
+        count++;
+    }
+
+    if (ferror(file)) failed = 1;
+    fclose(file);
+    if (failed) {
+        destroy_loaded(routes, count);
+        return -1;
+    }
+    return count;
+}
+
+// Host 헤더의 포트 부분을 제외해 규칙 파일의 호스트와 비교합니다.
+static int host_matches(const char *rule_host, const char *request_host) {
+    if (strcmp(rule_host, &quot;*&quot;) == 0) return 1;
+    if (request_host == NULL) return 0;
+
+    char host[256];
+    size_t length = strlen(request_host);
+    if (request_host[0] == &#x27;[&#x27;) {
+        const char *closing = strchr(request_host, &#x27;]&#x27;);
+        if (closing == NULL) return 0;
+        length = (size_t)(closing - request_host - 1);
+        request_host++;
+    } else {
+        const char *colon = strchr(request_host, &#x27;:&#x27;);
+        if (colon != NULL) length = (size_t)(colon - request_host);
+    }
+    if (length == 0 || length &gt;= sizeof(host)) return 0;
+    memcpy(host, request_host, length);
+    host[length] = &#x27;\0&#x27;;
+    return strcasecmp(rule_host, host) == 0;
+}
+
+// 가장 긴 경로 접두사를 우선하고, 길이가 같으면 호스트 일치 규칙을 우선합니다.
+struct route *route_match(struct route *routes, int count,
+                          const char *host, const char *target) {
+    if (routes == NULL || count &lt;= 0 || target == NULL) return NULL;
+
+    struct route *best = NULL;
+    size_t best_prefix = 0;
+    int best_exact_host = 0;
+    for (int i = 0; i &lt; count; i++) {
+        struct route *candidate = &amp;routes[i];
+        size_t prefix_len = strlen(candidate-&gt;prefix);
+        if (!host_matches(candidate-&gt;host, host) ||
+            strncmp(target, candidate-&gt;prefix, prefix_len) != 0) {
+            continue;
+        }
+
+        int exact_host = strcmp(candidate-&gt;host, &quot;*&quot;) != 0;
+        if (best == NULL || prefix_len &gt; best_prefix ||
+            (prefix_len == best_prefix &amp;&amp; exact_host &gt; best_exact_host)) {
+            best = candidate;
+            best_prefix = prefix_len;
+            best_exact_host = exact_host;
+        }
+    }
+    return best;
+}
+
+// mutex 안에서 번호를 하나 증가시키고 그 번호에 해당하는 백엔드를 돌려줍니다.
+const struct backend *route_pick(struct route *route) {
+    if (route == NULL || route-&gt;nbackends &lt;= 0) return NULL;
+    if (pthread_mutex_lock(&amp;route-&gt;mutex) != 0) return NULL;
+    unsigned index = route-&gt;next % (unsigned)route-&gt;nbackends;
+    route-&gt;next++;
+    pthread_mutex_unlock(&amp;route-&gt;mutex);
+    return &amp;route-&gt;backends[index];
+}
+
+// 각 규칙의 라운드 로빈 mutex를 제거합니다.
+void route_destroy(struct route *routes, int count) {
+    if (routes == NULL || count &lt;= 0) return;
+    destroy_loaded(routes, count);
+}
+</code></pre></details></article><article class="component"><h3>src/proxy.c</h3><p>리버스·포워드 프록시 요청을 만들고 upstream 응답을 중계합니다.</p><span class="path">전체 행: 1–406</span><details class="file"><summary><b>src/proxy.c</b><span>src/proxy.c:1–406행 · 406행</span></summary><p>함수 정의 시작 행: <code>upstream()</code> 22행 · <code>append_format()</code> 29행 · <code>valid_header_name()</code> 42행 · <code>valid_header_value()</code> 52행 · <code>connection_names_header()</code> 60행 · <code>is_hop_by_hop()</code> 86행 · <code>make_host_header()</code> 99행 · <code>build_request()</code> 108행 · <code>proxy_exchange_connected()</code> 174행 · <code>proxy_exchange()</code> 264행 · <code>proxy_reverse()</code> 283행 · <code>parse_absolute_target()</code> 324행 · <code>proxy_forward()</code> 392행</p><pre><code>#include &quot;proxy.h&quot;
+
+#include &quot;log.h&quot;
+#include &quot;net.h&quot;
+#include &quot;response.h&quot;
+#include &quot;route.h&quot;
+
+#include &lt;ctype.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdarg.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;unistd.h&gt;
+
+#define PROXY_HEADER_CAP 65536
+#define PROXY_IO_CAP 16384
+
+struct upstream {
+    char host[256];
+    char port[8];
+    char host_header[272];
+};
+
+// 버퍼 범위를 넘지 않도록 형식 문자열을 뒤에 덧붙입니다.
+static int append_format(char *buffer, size_t capacity, size_t *used,
+                         const char *format, ...) {
+    if (*used &gt;= capacity) return -1;
+    va_list args;
+    va_start(args, format);
+    int result = vsnprintf(buffer + *used, capacity - *used, format, args);
+    va_end(args);
+    if (result &lt; 0 || (size_t)result &gt;= capacity - *used) return -1;
+    *used += (size_t)result;
+    return 0;
+}
+
+// HTTP 헤더 이름에 허용된 토큰 문자만 있는지 검사합니다.
+static int valid_header_name(const char *name) {
+    if (name == NULL || *name == &#x27;\0&#x27;) return 0;
+    for (const unsigned char *p = (const unsigned char *)name; *p; p++) {
+        if (isalnum(*p)) continue;
+        if (strchr(&quot;!#$%&amp;&#x27;*+-.^_`|~&quot;, *p) == NULL) return 0;
+    }
+    return 1;
+}
+
+// 헤더 값의 줄바꿈과 제어 문자가 업스트림 요청을 위조하지 못하게 합니다.
+static int valid_header_value(const char *value) {
+    for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+        if ((*p &lt; 0x20 &amp;&amp; *p != &#x27;\t&#x27;) || *p == 0x7f) return 0;
+    }
+    return 1;
+}
+
+// 요청의 Connection 헤더가 추가로 지정한 홉 사이 헤더도 걸러냅니다.
+static int connection_names_header(const struct http_request *req,
+                                   const char *name) {
+    for (int i = 0; i &lt; req-&gt;nheaders; i++) {
+        if (strcasecmp(req-&gt;headers[i].name, &quot;Connection&quot;) != 0) continue;
+
+        char copy[1024];
+        size_t length = strlen(req-&gt;headers[i].value);
+        if (length &gt;= sizeof(copy)) return 1;
+        memcpy(copy, req-&gt;headers[i].value, length + 1);
+
+        char *save = NULL;
+        for (char *token = strtok_r(copy, &quot;,&quot;, &amp;save);
+             token != NULL; token = strtok_r(NULL, &quot;,&quot;, &amp;save)) {
+            while (*token == &#x27; &#x27; || *token == &#x27;\t&#x27;) token++;
+            size_t token_len = strlen(token);
+            while (token_len &gt; 0 &amp;&amp;
+                   (token[token_len - 1] == &#x27; &#x27; || token[token_len - 1] == &#x27;\t&#x27;)) {
+                token[--token_len] = &#x27;\0&#x27;;
+            }
+            if (strcasecmp(token, name) == 0) return 1;
+        }
+    }
+    return 0;
+}
+
+// 프록시가 다음 연결 구간으로 넘기지 않는 hop-by-hop 헤더를 판별합니다.
+static int is_hop_by_hop(const struct http_request *req, const char *name) {
+    static const char *const names[] = {
+        &quot;Connection&quot;, &quot;Keep-Alive&quot;, &quot;Proxy-Connection&quot;,
+        &quot;Proxy-Authenticate&quot;, &quot;Proxy-Authorization&quot;, &quot;TE&quot;, &quot;Trailer&quot;,
+        &quot;Transfer-Encoding&quot;, &quot;Upgrade&quot;
+    };
+    for (size_t i = 0; i &lt; sizeof(names) / sizeof(names[0]); i++) {
+        if (strcasecmp(name, names[i]) == 0) return 1;
+    }
+    return connection_names_header(req, name);
+}
+
+// 포트가 있는 IPv6 호스트에는 대괄호를 붙여 Host 형식으로 만듭니다.
+static int make_host_header(const char *host, const char *port,
+                            char *out, size_t capacity) {
+    int has_colon = strchr(host, &#x27;:&#x27;) != NULL;
+    int length = snprintf(out, capacity, has_colon ? &quot;[%s]:%s&quot; : &quot;%s:%s&quot;,
+                          host, port);
+    return length &lt; 0 || (size_t)length &gt;= capacity ? -1 : 0;
+}
+
+// 목적지 정보를 사용해 안전한 HTTP 요청 헤더를 새로 만듭니다.
+static char *build_request(const struct http_request *req,
+                           const char *request_target,
+                           const char *host_header,
+                           size_t body_len, const char *client_ip,
+                           size_t *header_len) {
+    char *buffer = malloc(PROXY_HEADER_CAP);
+    if (buffer == NULL) return NULL;
+    size_t used = 0;
+
+    if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;%s %s HTTP/1.1\r\n&quot;, req-&gt;method,
+                      request_target) &lt; 0 ||
+        append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;Host: %s\r\n&quot;, host_header) &lt; 0) {
+        free(buffer);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    int had_content_length = 0;
+    for (int i = 0; i &lt; req-&gt;nheaders; i++) {
+        const struct http_header *header = &amp;req-&gt;headers[i];
+        if (!valid_header_name(header-&gt;name) ||
+            !valid_header_value(header-&gt;value)) {
+            free(buffer);
+            errno = EINVAL;
+            return NULL;
+        }
+        if (strcasecmp(header-&gt;name, &quot;Content-Length&quot;) == 0) {
+            had_content_length = 1;
+            continue;
+        }
+        if (strcasecmp(header-&gt;name, &quot;Host&quot;) == 0 ||
+            strcasecmp(header-&gt;name, &quot;X-Forwarded-For&quot;) == 0 ||
+            is_hop_by_hop(req, header-&gt;name)) {
+            continue;
+        }
+        if (append_format(buffer, PROXY_HEADER_CAP, &amp;used, &quot;%s: %s\r\n&quot;,
+                          header-&gt;name, header-&gt;value) &lt; 0) {
+            free(buffer);
+            errno = EOVERFLOW;
+            return NULL;
+        }
+    }
+
+    if (had_content_length || body_len &gt; 0) {
+        if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                          &quot;Content-Length: %zu\r\n&quot;, body_len) &lt; 0) {
+            free(buffer);
+            errno = EOVERFLOW;
+            return NULL;
+        }
+    }
+    if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;X-Forwarded-For: %s\r\nConnection: close\r\n\r\n&quot;,
+                      client_ip != NULL ? client_ip : &quot;unknown&quot;) &lt; 0) {
+        free(buffer);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    *header_len = used;
+    return buffer;
+}
+
+// 연결·요청 전송·응답 중계를 한곳에서 처리하고 만든 소켓을 항상 닫습니다.
+static int proxy_exchange_connected(int client_fd,
+                                    const struct http_request *req,
+                                    const char *body, size_t body_len,
+                                    int upstream_fd, const char *host_header,
+                                    const char *request_target,
+                                    const char *client_ip,
+                                    int timeout_ms) {
+    size_t request_len = 0;
+    char *request = build_request(req, request_target, host_header,
+                                  body_len, client_ip, &amp;request_len);
+    if (request == NULL) {
+        int saved_error = errno;
+        server_log_errno(&quot;build proxy request&quot;, saved_error);
+        close(upstream_fd);
+        return resp_send_error(client_fd, 500) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+
+    if (net_send_all(upstream_fd, request, request_len) &lt; 0 ||
+        (body_len &gt; 0 &amp;&amp; net_send_all(upstream_fd, body, body_len) &lt; 0)) {
+        int saved_error = errno;
+        free(request);
+        close(upstream_fd);
+        server_log(&quot;upstream request send failed (errno=%d)\n&quot;, saved_error);
+        return resp_send_error(client_fd, 502) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+    free(request);
+
+    char buffer[PROXY_IO_CAP];
+    size_t relayed = 0;
+    int result = PROXY_HANDLED;
+    for (;;) {
+        int ready;
+        do {
+            ready = net_wait(upstream_fd, POLLIN, timeout_ms);
+        } while (ready &lt; 0 &amp;&amp; errno == EINTR);
+
+        if (ready == 0) {
+            if (relayed == 0) {
+                result = resp_send_error(client_fd, 504) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (ready &lt; 0) {
+            int saved_error = errno;
+            if (relayed == 0) {
+                server_log(&quot;upstream wait failed (errno=%d)\n&quot;, saved_error);
+                result = resp_send_error(client_fd, 502) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+
+        ssize_t count = recv(upstream_fd, buffer, sizeof(buffer), 0);
+        if (count &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (count &lt; 0 &amp;&amp; (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            if (relayed == 0) {
+                result = resp_send_error(client_fd, 504) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (count &lt; 0) {
+            int saved_error = errno;
+            if (relayed == 0) {
+                server_log(&quot;upstream receive failed (errno=%d)\n&quot;, saved_error);
+                result = resp_send_error(client_fd, 502) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (count == 0) break;
+
+        if (net_send_all(client_fd, buffer, (size_t)count) &lt; 0) {
+            int saved_error = errno;
+            if (saved_error != EPIPE &amp;&amp; saved_error != ECONNRESET) {
+                server_log(&quot;client response send failed (errno=%d)\n&quot;,
+                           saved_error);
+            }
+            result = PROXY_FAILED;
+            break;
+        }
+        relayed += (size_t)count;
+    }
+
+    close(upstream_fd);
+    return result;
+}
+
+// 업스트림에 연결하고, 연결 실패를 502 또는 504 응답으로 돌려줍니다.
+static int proxy_exchange(int client_fd, const struct http_request *req,
+                          const char *body, size_t body_len,
+                          const struct upstream *upstream,
+                          const char *request_target, const char *client_ip,
+                          int timeout_ms) {
+    int upstream_fd = net_connect(upstream-&gt;host, upstream-&gt;port, timeout_ms);
+    if (upstream_fd &lt; 0) {
+        int saved_error = errno;
+        int status = saved_error == ETIMEDOUT ? 504 : 502;
+        server_log(&quot;upstream connect failed (errno=%d, status=%d)\n&quot;,
+                   saved_error, status);
+        return resp_send_error(client_fd, status) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+    return proxy_exchange_connected(client_fd, req, body, body_len,
+                                    upstream_fd, upstream-&gt;host_header,
+                                    request_target, client_ip, timeout_ms);
+}
+
+// 라우팅 규칙을 찾아 백엔드를 차례로 시도하고 응답을 그대로 전달합니다.
+int proxy_reverse(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, const struct config *cfg,
+                  const char *client_ip) {
+    struct route *route = route_match(cfg-&gt;routes, cfg-&gt;route_count,
+                                      http_header_get(req, &quot;Host&quot;), req-&gt;target);
+    if (route == NULL) return PROXY_NO_ROUTE;
+
+    int timeout_ms = cfg-&gt;timeout_sec * 1000;
+    int last_error = ECONNREFUSED;
+    for (int attempt = 0; attempt &lt; route-&gt;nbackends; attempt++) {
+        const struct backend *backend = route_pick(route);
+        if (backend == NULL) return PROXY_FAILED;
+
+        struct upstream upstream;
+        memset(&amp;upstream, 0, sizeof(upstream));
+        memcpy(upstream.host, backend-&gt;host, strlen(backend-&gt;host) + 1);
+        memcpy(upstream.port, backend-&gt;port, strlen(backend-&gt;port) + 1);
+        if (make_host_header(upstream.host, upstream.port,
+                             upstream.host_header,
+                             sizeof(upstream.host_header)) &lt; 0) {
+            return resp_send_error(client_fd, 500) &lt; 0 ?
+                   PROXY_FAILED : PROXY_HANDLED;
+        }
+
+        int upstream_fd = net_connect(upstream.host, upstream.port, timeout_ms);
+        if (upstream_fd &lt; 0) {
+            last_error = errno;
+            continue;
+        }
+        return proxy_exchange_connected(client_fd, req, body, body_len,
+                                        upstream_fd, upstream.host_header,
+                                        req-&gt;target, client_ip, timeout_ms);
+    }
+
+    int status = last_error == ETIMEDOUT ? 504 : 502;
+    server_log(&quot;all route backends failed (errno=%d, status=%d)\n&quot;,
+               last_error, status);
+    return resp_send_error(client_fd, status) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+}
+
+// http:// authority와 경로를 나눠 포워드 프록시 목적지를 구성합니다.
+static int parse_absolute_target(const char *target, struct upstream *upstream,
+                                  char *origin, size_t origin_capacity) {
+    if (strncmp(target, &quot;https://&quot;, 8) == 0) return 400;
+    if (strncmp(target, &quot;http://&quot;, 7) != 0) return 400;
+
+    const char *authority = target + 7;
+    const char *path = strpbrk(authority, &quot;/?#&quot;);
+    size_t authority_len = path != NULL ? (size_t)(path - authority) :
+                          strlen(authority);
+    if (authority_len == 0 || authority_len &gt;= sizeof(upstream-&gt;host_header))
+        return 400;
+
+    char authority_copy[272];
+    memcpy(authority_copy, authority, authority_len);
+    authority_copy[authority_len] = &#x27;\0&#x27;;
+    if (strchr(authority_copy, &#x27;@&#x27;) != NULL) return 400;
+
+    const char *host_start = authority_copy;
+    const char *host_end = NULL;
+    const char *port = &quot;80&quot;;
+    if (authority_copy[0] == &#x27;[&#x27;) {
+        host_start++;
+        host_end = strchr(host_start, &#x27;]&#x27;);
+        if (host_end == NULL) return 400;
+        if (host_end[1] == &#x27;:&#x27;) port = host_end + 2;
+        else if (host_end[1] != &#x27;\0&#x27;) return 400;
+    } else {
+        const char *colon = strchr(authority_copy, &#x27;:&#x27;);
+        host_end = colon != NULL ? colon : authority_copy + authority_len;
+        if (colon != NULL) port = colon + 1;
+    }
+    size_t host_len = (size_t)(host_end - host_start);
+    if (host_len == 0 || host_len &gt;= sizeof(upstream-&gt;host) ||
+        strlen(port) &gt;= sizeof(upstream-&gt;port)) return 400;
+    for (const char *p = port; *p; p++) {
+        if (!isdigit((unsigned char)*p)) return 400;
+    }
+    char *port_end = NULL;
+    errno = 0;
+    long port_number = strtol(port, &amp;port_end, 10);
+    if (errno == ERANGE || port_end == port || *port_end != &#x27;\0&#x27; ||
+        port_number &lt; 1 || port_number &gt; 65535) return 400;
+
+    memcpy(upstream-&gt;host, host_start, host_len);
+    upstream-&gt;host[host_len] = &#x27;\0&#x27;;
+    memcpy(upstream-&gt;port, port, strlen(port) + 1);
+    memcpy(upstream-&gt;host_header, authority_copy, authority_len + 1);
+
+    if (path == NULL || *path == &#x27;#&#x27;) {
+        if (origin_capacity &lt; 2) return 400;
+        memcpy(origin, &quot;/&quot;, 2);
+    } else if (*path == &#x27;?&#x27;) {
+        int n = snprintf(origin, origin_capacity, &quot;/%s&quot;, path);
+        if (n &lt; 0 || (size_t)n &gt;= origin_capacity) return 414;
+    } else if (*path == &#x27;#&#x27;) {
+        if (origin_capacity &lt; 2) return 414;
+        memcpy(origin, &quot;/&quot;, 2);
+    } else {
+        const char *fragment = strchr(path, &#x27;#&#x27;);
+        size_t path_len = fragment != NULL ? (size_t)(fragment - path) : strlen(path);
+        if (path_len == 0 || path_len &gt;= origin_capacity) return 414;
+        memcpy(origin, path, path_len);
+        origin[path_len] = &#x27;\0&#x27;;
+    }
+    return 0;
+}
+
+// -f 모드에서 absolute-form 요청을 origin-form으로 바꾸어 전달합니다.
+int proxy_forward(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, int timeout_sec,
+                  const char *client_ip) {
+    struct upstream upstream;
+    memset(&amp;upstream, 0, sizeof(upstream));
+    char origin[2048];
+    int parse_result = parse_absolute_target(req-&gt;target, &amp;upstream,
+                                             origin, sizeof(origin));
+    if (parse_result != 0) {
+        return resp_send_error(client_fd, parse_result) &lt; 0 ?
+               PROXY_FAILED : PROXY_HANDLED;
+    }
+    return proxy_exchange(client_fd, req, body, body_len, &amp;upstream, origin,
+                          client_ip, timeout_sec * 1000);
+}
+</code></pre></details></article><article class="component"><h3>src/log.c</h3><p>공유 로그 출력의 동시 접근을 보호합니다.</p><span class="path">전체 행: 1–42</span><details class="file"><summary><b>src/log.c</b><span>src/log.c:1–42행 · 42행</span></summary><p>함수 정의 시작 행: <code>server_log()</code> 14행 · <code>server_log_errno()</code> 40행</p><pre><code>#include &quot;log.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;stdarg.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+
+#define LOG_LINE_CAP 4096
+
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// 먼저 한 줄을 만들고, mutex를 잡은 동안 stderr에 끝까지 씁니다.
+void server_log(const char *format, ...) {
+    char line[LOG_LINE_CAP];
+    va_list args;
+    va_start(args, format);
+    int length = vsnprintf(line, sizeof(line), format, args);
+    va_end(args);
+
+    if (length &lt; 0) return;
+    size_t remaining = (size_t)length;
+    if (remaining &gt;= sizeof(line)) remaining = sizeof(line) - 1;
+
+    int lock_result = pthread_mutex_lock(&amp;g_log_mutex);
+    if (lock_result != 0) return;
+
+    size_t written = 0;
+    while (written &lt; remaining) {
+        ssize_t count = write(STDERR_FILENO, line + written, remaining - written);
+        if (count &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (count &lt;= 0) break;
+        written += (size_t)count;
+    }
+
+    pthread_mutex_unlock(&amp;g_log_mutex);
+}
+
+// 오류 문자열 함수의 공유 버퍼를 쓰지 않고 오류 번호를 기록합니다.
+void server_log_errno(const char *operation, int error_number) {
+    server_log(&quot;%s failed (errno=%d)\n&quot;, operation, error_number);
+}
+</code></pre></details></article><article class="component"><h3>src/pool.c</h3><p>고정 worker와 mutex/condition 기반 대기열을 구현합니다. (순차·연결별 스레드 모델의 실행 경로에서는 호출하지 않습니다.)</p><span class="path">전체 행: 1–164</span><details class="file"><summary><b>src/pool.c</b><span>src/pool.c:1–164행 · 164행</span></summary><p>함수 정의 시작 행: <code>pool()</code> 8행 · <code>pool_worker()</code> 28행 · <code>pool_create()</code> 53행 · <code>pool_submit()</code> 107행 · <code>pool_shutdown()</code> 143행</p><pre><code>#include &quot;pool.h&quot;
+
+#include &lt;errno.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;stddef.h&gt;
+#include &lt;stdlib.h&gt;
+
+struct pool {
+    pthread_t *threads;
+    int worker_count;
+    int started_count;
+    int *queue;
+    size_t queue_cap;
+    size_t head;
+    size_t tail;
+    size_t count;
+    int stopping;
+    void (*handler)(int fd);
+    pthread_mutex_t mutex;
+    pthread_cond_t not_empty;
+    pthread_cond_t not_full;
+    int mutex_ready;
+    int not_empty_ready;
+    int not_full_ready;
+};
+
+// 일꾼은 큐가 비면 잠들고, 연결 하나를 꺼내 처리한 뒤 다시 기다립니다.
+static void *pool_worker(void *argument) {
+    struct pool *p = argument;
+
+    for (;;) {
+        pthread_mutex_lock(&amp;p-&gt;mutex);
+        while (p-&gt;count == 0 &amp;&amp; !p-&gt;stopping) {
+            pthread_cond_wait(&amp;p-&gt;not_empty, &amp;p-&gt;mutex);
+        }
+
+        if (p-&gt;count == 0 &amp;&amp; p-&gt;stopping) {
+            pthread_mutex_unlock(&amp;p-&gt;mutex);
+            return NULL;
+        }
+
+        int fd = p-&gt;queue[p-&gt;head];
+        p-&gt;head = (p-&gt;head + 1) % p-&gt;queue_cap;
+        p-&gt;count--;
+        pthread_cond_signal(&amp;p-&gt;not_full);
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+
+        p-&gt;handler(fd);
+    }
+}
+
+// mutex·조건 변수·대기열을 준비한 뒤 지정한 수만큼 일꾼을 시작합니다.
+struct pool *pool_create(int workers, int queue_cap, void (*handler)(int fd)) {
+    if (workers &lt;= 0 || queue_cap &lt;= 0 || handler == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    struct pool *p = calloc(1, sizeof(*p));
+    if (p == NULL) return NULL;
+
+    p-&gt;threads = calloc((size_t)workers, sizeof(*p-&gt;threads));
+    p-&gt;queue = calloc((size_t)queue_cap, sizeof(*p-&gt;queue));
+    if (p-&gt;threads == NULL || p-&gt;queue == NULL) goto fail;
+
+    p-&gt;worker_count = workers;
+    p-&gt;queue_cap = (size_t)queue_cap;
+    p-&gt;handler = handler;
+
+    int result = pthread_mutex_init(&amp;p-&gt;mutex, NULL);
+    if (result != 0) {
+        errno = result;
+        goto fail;
+    }
+    p-&gt;mutex_ready = 1;
+
+    result = pthread_cond_init(&amp;p-&gt;not_empty, NULL);
+    if (result != 0) {
+        errno = result;
+        goto fail;
+    }
+    p-&gt;not_empty_ready = 1;
+
+    result = pthread_cond_init(&amp;p-&gt;not_full, NULL);
+    if (result != 0) {
+        errno = result;
+        goto fail;
+    }
+    p-&gt;not_full_ready = 1;
+
+    for (int i = 0; i &lt; workers; i++) {
+        result = pthread_create(&amp;p-&gt;threads[i], NULL, pool_worker, p);
+        if (result != 0) {
+            errno = result;
+            goto fail;
+        }
+        p-&gt;started_count++;
+    }
+    return p;
+
+fail:
+    pool_shutdown(p);
+    return NULL;
+}
+
+// 큐가 가득 찬 동안 기다렸다가 연결 fd를 원형 대기열에 넣습니다.
+int pool_submit(struct pool *p, int fd) {
+    if (p == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    int result = pthread_mutex_lock(&amp;p-&gt;mutex);
+    if (result != 0) {
+        errno = result;
+        return -1;
+    }
+
+    while (p-&gt;count == p-&gt;queue_cap &amp;&amp; !p-&gt;stopping) {
+        result = pthread_cond_wait(&amp;p-&gt;not_full, &amp;p-&gt;mutex);
+        if (result != 0) {
+            pthread_mutex_unlock(&amp;p-&gt;mutex);
+            errno = result;
+            return -1;
+        }
+    }
+
+    if (p-&gt;stopping) {
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+        errno = ECANCELED;
+        return -1;
+    }
+
+    p-&gt;queue[p-&gt;tail] = fd;
+    p-&gt;tail = (p-&gt;tail + 1) % p-&gt;queue_cap;
+    p-&gt;count++;
+    pthread_cond_signal(&amp;p-&gt;not_empty);
+    pthread_mutex_unlock(&amp;p-&gt;mutex);
+    return 0;
+}
+
+// 제출을 막고 대기 중인 일꾼을 깨운 뒤 큐를 비우고 자원을 해제합니다.
+void pool_shutdown(struct pool *p) {
+    if (p == NULL) return;
+
+    if (p-&gt;mutex_ready) {
+        pthread_mutex_lock(&amp;p-&gt;mutex);
+        p-&gt;stopping = 1;
+        if (p-&gt;not_empty_ready) pthread_cond_broadcast(&amp;p-&gt;not_empty);
+        if (p-&gt;not_full_ready) pthread_cond_broadcast(&amp;p-&gt;not_full);
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+    }
+
+    for (int i = 0; i &lt; p-&gt;started_count; i++) {
+        pthread_join(p-&gt;threads[i], NULL);
+    }
+
+    if (p-&gt;not_full_ready) pthread_cond_destroy(&amp;p-&gt;not_full);
+    if (p-&gt;not_empty_ready) pthread_cond_destroy(&amp;p-&gt;not_empty);
+    if (p-&gt;mutex_ready) pthread_mutex_destroy(&amp;p-&gt;mutex);
+    free(p-&gt;queue);
+    free(p-&gt;threads);
+    free(p);
+}
+</code></pre></details></article></div></section><section><h2>공유 인터페이스 · 헤더</h2><p class="muted">헤더는 호출자가 사용하는 구조체·상수·함수 선언을 정의합니다. 각 파일을 펼치면 전체 줄과 정의 행을 확인할 수 있습니다.</p><div class="grid"><article class="component"><h3>include/cgi.h</h3><span class="path">전체 행: 1–10</span><details class="file"><summary><b>include/cgi.h</b><span>include/cgi.h:1–10행 · 10행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef CGI_H
+#define CGI_H
+
+#include &quot;config.h&quot;
+#include &quot;http.h&quot;
+
+int cgi_serve(int fd, const struct config *cfg, const struct http_request *req,
+              const char *body, size_t body_len);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/config.h</h3><span class="path">전체 행: 1–23</span><details class="file"><summary><b>include/config.h</b><span>include/config.h:1–23행 · 23행</span></summary><p>함수 정의 시작 행: <code>config()</code> 4행</p><pre><code>#ifndef CONFIG_H
+#define CONFIG_H
+
+struct route;
+
+struct config {
+    const char *host;
+    int port;
+    int backlog;
+    const char *root;
+    int workers;
+    int timeout_sec;
+    const char *routes_path;
+    int forward_proxy;
+    struct route *routes;
+    int route_count;
+};
+
+// 실행 인자를 읽어 기본 설정을 덮어쓰고, 오류 또는 도움말 여부를 돌려줍니다.
+int config_parse(int argc, char **argv, struct config *cfg);
+void config_usage(const char *program);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/conn.h</h3><span class="path">전체 행: 1–11</span><details class="file"><summary><b>include/conn.h</b><span>include/conn.h:1–11행 · 11행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef CONN_H
+#define CONN_H
+
+#include &quot;config.h&quot;
+
+// 이 헤더를 여러 번 포함해도 같은 선언이 중복 처리되지 않게 막습니다.
+
+// 연결 하나에서 요청을 읽고 응답을 보낸 뒤 전달받은 소켓 번호를 닫습니다.
+void conn_handle(int fd, const char *client_ip, const struct config *cfg);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/http.h</h3><span class="path">전체 행: 1–42</span><details class="file"><summary><b>include/http.h</b><span>include/http.h:1–42행 · 42행</span></summary><p>함수 정의 시작 행: <code>http_result()</code> 9행 · <code>http_header()</code> 21행 · <code>http_request()</code> 26행</p><pre><code>#ifndef HTTP_H
+#define HTTP_H
+
+#include &lt;stddef.h&gt;
+
+#define HTTP_MAX_BODY 1048576
+
+// 요청 해석 결과를 호출한 프로그램에 알려 주는 값입니다.
+enum http_result {
+    HTTP_OK,
+    HTTP_INCOMPLETE,
+    HTTP_BAD_REQUEST,
+    HTTP_URI_TOO_LONG,
+    HTTP_HEADER_TOO_LARGE,
+    HTTP_NOT_IMPLEMENTED,
+    HTTP_VERSION_NOT_SUPPORTED,
+    HTTP_PAYLOAD_TOO_LARGE
+};
+
+// 해석한 요청 줄과 이후 헤더 정보를 담는 구조체입니다.
+struct http_header {
+    char name[64];
+    char value[1024];
+};
+
+struct http_request {
+    char method[8];
+    char target[2048];
+    char version[16];
+    struct http_header headers[32];
+    int nheaders;
+    long content_length;
+    int keep_alive;
+    size_t header_len;
+};
+
+// 입력 버퍼를 수정하지 않고 HTTP 요청을 해석합니다.
+enum http_result http_parse(const char *buf, size_t len, struct http_request *req);
+const char *http_header_get(const struct http_request *req, const char *name);
+const char *http_result_name(enum http_result result);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/log.h</h3><span class="path">전체 행: 1–8</span><details class="file"><summary><b>include/log.h</b><span>include/log.h:1–8행 · 8행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef LOG_H
+#define LOG_H
+
+// 여러 스레드가 함께 쓰는 서버 기록을 한 줄씩 안전하게 출력합니다.
+void server_log(const char *format, ...);
+void server_log_errno(const char *operation, int error_number);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/mime.h</h3><span class="path">전체 행: 1–6</span><details class="file"><summary><b>include/mime.h</b><span>include/mime.h:1–6행 · 6행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef MIME_H
+#define MIME_H
+
+const char *mime_from_path(const char *path);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/net.h</h3><span class="path">전체 행: 1–18</span><details class="file"><summary><b>include/net.h</b><span>include/net.h:1–18행 · 18행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef NET_H
+#define NET_H
+
+#include &lt;stddef.h&gt;
+
+// 이 헤더를 여러 번 포함해도 같은 선언이 중복 처리되지 않게 막습니다.
+
+// host와 port에 바인딩해 연결 요청을 기다리는 소켓을 만듭니다.
+// 성공하면 듣는 소켓의 번호를, 실패하면 -1을 반환합니다.
+int net_listen(const char *host, int port, int backlog);
+int net_connect(const char *host, const char *port, int timeout_ms);
+int net_send_all(int fd, const void *buf, size_t len);
+int net_set_timeouts(int fd, int seconds);
+int net_set_nonblock(int fd);
+int net_set_blocking(int fd);
+int net_wait(int fd, short events, int timeout_ms);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/pool.h</h3><span class="path">전체 행: 1–15</span><details class="file"><summary><b>include/pool.h</b><span>include/pool.h:1–15행 · 15행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef POOL_H
+#define POOL_H
+
+struct pool;
+
+// 고정 수의 일꾼과 고정 크기 연결 대기열을 만듭니다.
+struct pool *pool_create(int workers, int queue_cap, void (*handler)(int fd));
+
+// 연결 번호를 대기열에 넣습니다. 성공하면 풀의 일꾼이 fd를 닫습니다.
+int pool_submit(struct pool *p, int fd);
+
+// 새 제출을 막고 남은 연결을 처리한 뒤 모든 일꾼과 자원을 정리합니다.
+void pool_shutdown(struct pool *p);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/proxy.h</h3><span class="path">전체 행: 1–25</span><details class="file"><summary><b>include/proxy.h</b><span>include/proxy.h:1–25행 · 25행</span></summary><p>함수 정의 시작 행: <code>proxy_result()</code> 9행</p><pre><code>#ifndef PROXY_H
+#define PROXY_H
+
+#include &quot;config.h&quot;
+#include &quot;http.h&quot;
+
+#include &lt;stddef.h&gt;
+
+enum proxy_result {
+    PROXY_FAILED = -1,
+    PROXY_HANDLED = 0,
+    PROXY_NO_ROUTE = 1
+};
+
+// 일치하는 리버스 프록시 규칙이 없으면 PROXY_NO_ROUTE를 돌려줍니다.
+int proxy_reverse(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, const struct config *cfg,
+                  const char *client_ip);
+
+// absolute-form HTTP 요청을 해석해 포워드 프록시로 전달합니다.
+int proxy_forward(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, int timeout_sec,
+                  const char *client_ip);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/response.h</h3><span class="path">전체 행: 1–13</span><details class="file"><summary><b>include/response.h</b><span>include/response.h:1–13행 · 13행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef RESPONSE_H
+#define RESPONSE_H
+
+#include &lt;stddef.h&gt;
+
+const char *resp_reason(int status);
+int resp_send_head(int fd, int status, const char *content_type,
+                   long content_length, int keep_alive);
+int resp_send_simple(int fd, int status, const char *content_type,
+                     const char *body, size_t len, int keep_alive);
+int resp_send_error(int fd, int status);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/route.h</h3><span class="path">전체 행: 1–37</span><details class="file"><summary><b>include/route.h</b><span>include/route.h:1–37행 · 37행</span></summary><p>함수 정의 시작 행: <code>backend()</code> 9행 · <code>route()</code> 14행</p><pre><code>#ifndef ROUTE_H
+#define ROUTE_H
+
+#include &lt;pthread.h&gt;
+
+#define ROUTE_MAX 64
+#define ROUTE_BACKEND_MAX 8
+
+struct backend {
+    char host[256];
+    char port[8];
+};
+
+struct route {
+    char host[256];
+    char prefix[256];
+    struct backend backends[ROUTE_BACKEND_MAX];
+    int nbackends;
+    unsigned next;
+    pthread_mutex_t mutex;
+    int mutex_ready;
+};
+
+// 라우팅 규칙 파일을 읽고 만든 규칙 수를 돌려줍니다.
+int route_load(const char *path, struct route *routes, int max);
+
+// 모든 규칙에서 호스트와 경로 접두사가 맞는 가장 구체적인 규칙을 찾습니다.
+struct route *route_match(struct route *routes, int count,
+                          const char *host, const char *target);
+
+// 규칙의 백엔드를 mutex로 보호하며 차례대로 선택합니다.
+const struct backend *route_pick(struct route *route);
+
+// route_load()가 초기화한 mutex를 없앱니다.
+void route_destroy(struct route *routes, int count);
+
+#endif
+</code></pre></details></article><article class="component"><h3>include/static.h</h3><span class="path">전체 행: 1–10</span><details class="file"><summary><b>include/static.h</b><span>include/static.h:1–10행 · 10행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#ifndef STATIC_H
+#define STATIC_H
+
+#include &quot;config.h&quot;
+#include &quot;http.h&quot;
+
+// 0은 파일 응답 완료, 1은 오류 응답 완료, -1은 전송 실패입니다.
+int static_serve(int fd, const struct config *cfg, const struct http_request *req);
+
+#endif
+</code></pre></details></article></div></section><section><h2>빌드·검사 코드</h2><p class="muted">프로젝트의 빌드 규칙, 환경 확인, 기능 검사 및 단위 검사 코드도 목록에서 제외하지 않았습니다.</p><div class="grid"><article class="component"><h3>Makefile</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–61</span><details class="file"><summary><b>Makefile</b><span>Makefile:1–61행 · 61행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>CC      := cc
+CSTD    := -std=c11
+WARN    := -Wall -Wextra -Wpedantic
+THREAD_FLAGS := -pthread
+CFLAGS  := $(CSTD) $(WARN) -g -O0 -Iinclude $(THREAD_FLAGS)
+LDFLAGS := $(THREAD_FLAGS)
+
+SRC := $(wildcard src/*.c)
+OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
+BIN := build/server
+TEST_HTTP_BIN := build/test_http
+TEST_MIME_BIN := build/test_mime
+TEST_ROUTE_BIN := build/test_route
+TEST_HTTP_SRC := tests/test_http.c src/http.c
+TEST_MIME_SRC := tests/test_mime.c src/mime.c
+TEST_ROUTE_SRC := tests/test_route.c src/route.c
+
+.PHONY: all asan tsan run clean test test-asan
+
+all: $(BIN)
+
+$(BIN): $(OBJ)
+	$(CC) $(OBJ) $(LDFLAGS) -o $@
+
+build/%.o: src/%.c | build
+	$(CC) $(CFLAGS) -c $&lt; -o $@
+
+build:
+	mkdir -p build
+
+asan: CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer
+asan: LDFLAGS += -fsanitize=address,undefined
+asan: clean all
+
+tsan: CFLAGS += -fsanitize=thread -fno-omit-frame-pointer
+tsan: LDFLAGS += -fsanitize=thread
+tsan: clean all
+
+$(TEST_HTTP_BIN): $(TEST_HTTP_SRC) include/http.h | build
+	$(CC) $(CFLAGS) $(TEST_HTTP_SRC) $(LDFLAGS) -o $@
+
+$(TEST_MIME_BIN): $(TEST_MIME_SRC) include/mime.h | build
+	$(CC) $(CFLAGS) $(TEST_MIME_SRC) $(LDFLAGS) -o $@
+
+$(TEST_ROUTE_BIN): $(TEST_ROUTE_SRC) include/route.h | build
+	$(CC) $(CFLAGS) $(TEST_ROUTE_SRC) $(LDFLAGS) -o $@
+
+test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN)
+	./$(TEST_HTTP_BIN)
+	./$(TEST_MIME_BIN)
+	./$(TEST_ROUTE_BIN)
+
+test-asan: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+test-asan: LDFLAGS += -fsanitize=address,undefined
+test-asan: clean test
+
+run: all
+	./$(BIN)
+
+clean:
+	rm -rf build
+</code></pre></details></article><article class="component"><h3>tests/test_http.c</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–91</span><details class="file"><summary><b>tests/test_http.c</b><span>tests/test_http.c:1–91행 · 91행</span></summary><p>함수 정의 시작 행: <code>parse()</code> 8행 · <code>test_valid_get_and_trimmed_header()</code> 12행 · <code>test_post_content_length()</code> 21행 · <code>test_incomplete_and_bad_request_line()</code> 29행 · <code>test_unsupported_method_and_version()</code> 36행 · <code>test_long_target_and_too_many_headers()</code> 42행 · <code>test_bad_header_and_content_length()</code> 66행 · <code>test_host_and_transfer_encoding()</code> 74행 · <code>main()</code> 81행</p><pre><code>#include &quot;http.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+static enum http_result parse(const char *text, struct http_request *req) {
+    return http_parse(text, strlen(text), req);
+}
+
+static void test_valid_get_and_trimmed_header(void) {
+    const char *text = &quot;GET /a HTTP/1.1\r\nHost: example.test\r\nX-Test:  \thi \t \r\n\r\n&quot;;
+    struct http_request req;
+    assert(parse(text, &amp;req) == HTTP_OK);
+    assert(strcmp(req.method, &quot;GET&quot;) == 0);
+    assert(strcmp(req.target, &quot;/a&quot;) == 0);
+    assert(strcmp(http_header_get(&amp;req, &quot;x-tEsT&quot;), &quot;hi&quot;) == 0);
+}
+
+static void test_post_content_length(void) {
+    const char *text = &quot;POST /echo HTTP/1.1\r\nHost: example.test\r\nContent-Length: 7\r\n\r\na=1&amp;b=2&quot;;
+    struct http_request req;
+    assert(parse(text, &amp;req) == HTTP_OK);
+    assert(req.content_length == 7);
+    assert(req.header_len == strlen(text) - 7);
+}
+
+static void test_incomplete_and_bad_request_line(void) {
+    struct http_request req;
+    const char *incomplete = &quot;GET / HTTP/1.1\r\nHost: x\r\n&quot;;
+    assert(http_parse(incomplete, strlen(incomplete), &amp;req) == HTTP_INCOMPLETE);
+    assert(parse(&quot;GET /only-one-space\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+}
+
+static void test_unsupported_method_and_version(void) {
+    struct http_request req;
+    assert(parse(&quot;PUT / HTTP/1.1\r\nHost: x\r\n\r\n&quot;, &amp;req) == HTTP_NOT_IMPLEMENTED);
+    assert(parse(&quot;GET / HTTP/9.9\r\nHost: x\r\n\r\n&quot;, &amp;req) == HTTP_VERSION_NOT_SUPPORTED);
+}
+
+static void test_long_target_and_too_many_headers(void) {
+    struct http_request req;
+    char *long_target = malloc(2100);
+    assert(long_target != NULL);
+    const char *prefix = &quot;GET /&quot;;
+    size_t pos = strlen(prefix);
+    memcpy(long_target, prefix, pos);
+    memset(long_target + pos, &#x27;a&#x27;, 2048);
+    pos += 2048;
+    const char *suffix = &quot; HTTP/1.1\r\nHost: x\r\n\r\n&quot;;
+    size_t suffix_len = strlen(suffix);
+    memcpy(long_target + pos, suffix, suffix_len);
+    pos += suffix_len;
+    assert(http_parse(long_target, pos, &amp;req) == HTTP_URI_TOO_LONG);
+    free(long_target);
+
+    char headers[1200] = &quot;GET / HTTP/1.1\r\nHost: x\r\n&quot;;
+    for (int i = 0; i &lt; 32; i++) {
+        strcat(headers, &quot;X: y\r\n&quot;);
+    }
+    strcat(headers, &quot;\r\n&quot;);
+    assert(parse(headers, &amp;req) == HTTP_HEADER_TOO_LARGE);
+}
+
+static void test_bad_header_and_content_length(void) {
+    struct http_request req;
+    assert(parse(&quot;GET / HTTP/1.1\r\nHost x\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: abc\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 2000000\r\n\r\n&quot;, &amp;req) == HTTP_PAYLOAD_TOO_LARGE);
+}
+
+static void test_host_and_transfer_encoding(void) {
+    struct http_request req;
+    assert(parse(&quot;GET / HTTP/1.1\r\nX: y\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;GET / HTTP/1.1\r\nhOsT: example.test\r\n\r\n&quot;, &amp;req) == HTTP_OK);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n&quot;, &amp;req) == HTTP_NOT_IMPLEMENTED);
+}
+
+int main(void) {
+    test_valid_get_and_trimmed_header();
+    test_post_content_length();
+    test_incomplete_and_bad_request_line();
+    test_unsupported_method_and_version();
+    test_long_target_and_too_many_headers();
+    test_bad_header_and_content_length();
+    test_host_and_transfer_encoding();
+    puts(&quot;all HTTP parser tests passed&quot;);
+    return 0;
+}
+</code></pre></details></article><article class="component"><h3>tests/test_mime.c</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–21</span><details class="file"><summary><b>tests/test_mime.c</b><span>tests/test_mime.c:1–21행 · 21행</span></summary><p>함수 정의 시작 행: <code>expect()</code> 7행 · <code>main()</code> 11행</p><pre><code>#include &quot;mime.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+static void expect(const char *path, const char *type) {
+    assert(strcmp(mime_from_path(path), type) == 0);
+}
+
+int main(void) {
+    expect(&quot;a.HTML&quot;, &quot;text/html; charset=utf-8&quot;);
+    expect(&quot;a.tar.gz&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;noext&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;.hidden&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;dir.d/file&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;/www/site.css&quot;, &quot;text/css; charset=utf-8&quot;);
+    expect(&quot;image.JPEG&quot;, &quot;image/jpeg&quot;);
+    puts(&quot;all MIME tests passed&quot;);
+    return 0;
+}
+</code></pre></details></article><article class="component"><h3>tests/test_route.c</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–46</span><details class="file"><summary><b>tests/test_route.c</b><span>tests/test_route.c:1–46행 · 46행</span></summary><p>함수 정의 시작 행: <code>main()</code> 9행</p><pre><code>#include &quot;route.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+// 이 테스트가 만든 규칙 파일을 읽고 라우팅 우선순위와 백엔드 순서를 확인합니다.
+int main(void) {
+    const char *path = &quot;build/test_routes.conf&quot;;
+    FILE *file = fopen(path, &quot;w&quot;);
+    assert(file != NULL);
+    fputs(&quot;# wildcard fallback\n&quot;, file);
+    fputs(&quot;* /api/ 127.0.0.1:8001 127.0.0.1:8002\n&quot;, file);
+    fputs(&quot;api.example /api/ 127.0.0.1:8003\n&quot;, file);
+    fputs(&quot;api.example /api/v2/ 127.0.0.1:8004\n&quot;, file);
+    assert(fclose(file) == 0);
+
+    struct route routes[ROUTE_MAX] = {0};
+    int count = route_load(path, routes, ROUTE_MAX);
+    assert(count == 3);
+
+    struct route *route = route_match(routes, count, &quot;api.example:8080&quot;,
+                                      &quot;/api/v2/users&quot;);
+    assert(route == &amp;routes[2]);
+
+    route = route_match(routes, count, &quot;api.example:8080&quot;, &quot;/api/users&quot;);
+    assert(route == &amp;routes[1]);
+
+    route = route_match(routes, count, &quot;other.example:8080&quot;, &quot;/api/users&quot;);
+    assert(route == &amp;routes[0]);
+
+    assert(route_match(routes, count, &quot;other.example&quot;, &quot;/static/index.html&quot;) == NULL);
+
+    const struct backend *backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8001&quot;) == 0);
+    backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8002&quot;) == 0);
+    backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8001&quot;) == 0);
+
+    route_destroy(routes, count);
+    assert(unlink(path) == 0);
+    puts(&quot;all route tests passed&quot;);
+    return 0;
+}
+</code></pre></details></article><article class="component"><h3>scripts/check_env.sh</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–45</span><details class="file"><summary><b>scripts/check_env.sh</b><span>scripts/check_env.sh:1–45행 · 45행</span></summary><p>함수 정의 시작 행: 함수 정의를 자동 색인하지 않은 파일입니다. 전체 행 범위에서 확인하세요.</p><pre><code>#!/bin/sh
+# macOS 개발 환경 점검. 아무것도 설치하거나 고치지 않고 출력만 합니다.
+
+echo &quot;== 시스템 ==&quot;
+sw_vers
+echo &quot;CPU: $(uname -m)&quot;
+
+echo &quot;== 필수 도구 ==&quot;
+for t in cc make git lldb leaks curl nc netstat lsof python3; do
+  if command -v &quot;$t&quot; &gt;/dev/null 2&gt;&amp;1; then
+    echo &quot;OK       $t  ($(command -v &quot;$t&quot;))&quot;
+  else
+    echo &quot;MISSING  $t&quot;
+  fi
+done
+
+echo &quot;== 선택 도구 ==&quot;
+for t in ab wrk hey brew; do
+  if command -v &quot;$t&quot; &gt;/dev/null 2&gt;&amp;1; then
+    echo &quot;OK       $t  ($(command -v &quot;$t&quot;))&quot;
+  else
+    echo &quot;없음     $t&quot;
+  fi
+done
+
+echo &quot;== 버전 ==&quot;
+cc --version | head -n 1
+make --version | head -n 1
+git --version
+
+echo &quot;== 한도와 커널 값 ==&quot;
+echo &quot;열 수 있는 fd 수 (ulimit -n): $(ulimit -n)&quot;
+sysctl kern.ipc.somaxconn
+sysctl net.inet.tcp.msl
+
+echo &quot;== 8080 포트 ==&quot;
+if nc -z 127.0.0.1 8080 &gt;/dev/null 2&gt;&amp;1; then
+  echo &quot;사용 중 (연결됨):&quot;
+  lsof -nP -iTCP:8080 -sTCP:LISTEN
+elif netstat -an -p tcp | grep LISTEN | grep -q &#x27;\.8080 &#x27;; then
+  echo &quot;사용 중 (LISTEN 줄 있음):&quot;
+  netstat -an -p tcp | grep LISTEN | grep &#x27;\.8080 &#x27;
+else
+  echo &quot;비어 있음 (연결 거부 + LISTEN 줄 없음)&quot;
+fi
+</code></pre></details></article><article class="component"><h3>scripts/functional_test.sh</h3><p>검증·빌드 경로</p><span class="path">전체 행: 1–225</span><details class="file"><summary><b>scripts/functional_test.sh</b><span>scripts/functional_test.sh:1–225행 · 225행</span></summary><p>함수 정의 시작 행: <code>cleanup()</code> 25행 · <code>pass()</code> 37행 · <code>fail()</code> 38행 · <code>port_is_busy()</code> 40행 · <code>status_for()</code> 107행 · <code>concurrent_pids()</code> 179행</p><pre><code>#!/bin/bash
+
+# 프로젝트 루트에서 서버·백엔드·curl 검사를 시작하고 종료 때 자원을 정리합니다.
+set -u
+
+ROOT_DIR=$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)/..&quot; &amp;&amp; pwd)
+cd &quot;$ROOT_DIR&quot;
+
+SERVER_PORT=${TEST_PORT:-8080}
+BACKEND_A_PORT=8001
+BACKEND_B_PORT=8002
+BUILD_DIR=&quot;$ROOT_DIR/build&quot;
+BACKEND_A_DIR=&quot;$BUILD_DIR/functional_backend_a&quot;
+BACKEND_B_DIR=&quot;$BUILD_DIR/functional_backend_b&quot;
+ROUTES_FILE=&quot;$BUILD_DIR/functional_routes.conf&quot;
+SERVER_LOG=&quot;$BUILD_DIR/functional_server.log&quot;
+LARGE_TEST_FILE=&quot;$ROOT_DIR/www/large-test.bin&quot;
+
+server_pid=&quot;&quot;
+backend_a_pid=&quot;&quot;
+backend_b_pid=&quot;&quot;
+slow_backend_pid=&quot;&quot;
+failures=0
+
+cleanup() {
+    for pid in &quot;$server_pid&quot; &quot;$backend_a_pid&quot; &quot;$backend_b_pid&quot; &quot;$slow_backend_pid&quot;; do
+        if [[ -n &quot;$pid&quot; ]]; then kill &quot;$pid&quot; 2&gt;/dev/null || true; fi
+    done
+    for pid in &quot;$server_pid&quot; &quot;$backend_a_pid&quot; &quot;$backend_b_pid&quot; &quot;$slow_backend_pid&quot;; do
+        if [[ -n &quot;$pid&quot; ]]; then wait &quot;$pid&quot; 2&gt;/dev/null || true; fi
+    done
+    rm -rf &quot;$BACKEND_A_DIR&quot; &quot;$BACKEND_B_DIR&quot; &quot;$ROUTES_FILE&quot;
+    rm -f &quot;$LARGE_TEST_FILE&quot;
+}
+trap cleanup EXIT INT TERM
+
+pass() { printf &#x27;PASS %s\n&#x27; &quot;$1&quot;; }
+fail() { printf &#x27;FAIL %s\n&#x27; &quot;$1&quot;; failures=$((failures + 1)); }
+
+port_is_busy() { nc -z 127.0.0.1 &quot;$1&quot; &gt;/dev/null 2&gt;&amp;1; }
+
+for port in &quot;$SERVER_PORT&quot; &quot;$BACKEND_A_PORT&quot; &quot;$BACKEND_B_PORT&quot;; do
+    if port_is_busy &quot;$port&quot;; then
+        printf &#x27;포트 %s가 이미 사용 중입니다. 해당 프로세스는 종료하지 않았습니다.\n&#x27; &quot;$port&quot; &gt;&amp;2
+        exit 2
+    fi
+done
+
+if [[ ! -x ./build/server ]]; then
+    printf &#x27;build/server가 없습니다. 먼저 make를 실행하세요.\n&#x27; &gt;&amp;2
+    exit 2
+fi
+
+mkdir -p &quot;$BACKEND_A_DIR/api&quot; &quot;$BACKEND_B_DIR/api&quot;
+if [[ -e &quot;$LARGE_TEST_FILE&quot; ]]; then
+    printf &#x27;시험 파일 경로가 이미 있습니다: %s\n&#x27; &quot;$LARGE_TEST_FILE&quot; &gt;&amp;2
+    exit 2
+fi
+truncate -s 33554432 &quot;$LARGE_TEST_FILE&quot;
+printf &#x27;backend A\n&#x27; &gt; &quot;$BACKEND_A_DIR/index.html&quot;
+printf &#x27;backend B\n&#x27; &gt; &quot;$BACKEND_B_DIR/index.html&quot;
+printf &#x27;backend A\n&#x27; &gt; &quot;$BACKEND_A_DIR/api/index.html&quot;
+printf &#x27;backend B\n&#x27; &gt; &quot;$BACKEND_B_DIR/api/index.html&quot;
+
+# 닫힌 백엔드는 운영체제가 고른 임시 포트로 지정합니다.
+DEAD_PORT=$(python3 -c &#x27;import socket; s=socket.socket(); s.bind((&quot;127.0.0.1&quot;, 0)); print(s.getsockname()[1]); s.close()&#x27;)
+SLOW_PORT=$(python3 -c &#x27;import socket; s=socket.socket(); s.bind((&quot;127.0.0.1&quot;, 0)); print(s.getsockname()[1]); s.close()&#x27;)
+cat &gt; &quot;$ROUTES_FILE&quot; &lt;&lt;ROUTES
+* /api/ 127.0.0.1:$BACKEND_A_PORT 127.0.0.1:$BACKEND_B_PORT
+* /dead/ 127.0.0.1:$DEAD_PORT
+* /timeout/ 127.0.0.1:$SLOW_PORT
+ROUTES
+
+python3 -m http.server &quot;$BACKEND_A_PORT&quot; --bind 127.0.0.1 \
+    --directory &quot;$BACKEND_A_DIR&quot; &gt; &quot;$BUILD_DIR/backend_a.log&quot; 2&gt;&amp;1 &amp;
+backend_a_pid=$!
+python3 -m http.server &quot;$BACKEND_B_PORT&quot; --bind 127.0.0.1 \
+    --directory &quot;$BACKEND_B_DIR&quot; &gt; &quot;$BUILD_DIR/backend_b.log&quot; 2&gt;&amp;1 &amp;
+backend_b_pid=$!
+python3 -c &#x27;import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind((&quot;127.0.0.1&quot;, int(__import__(&quot;sys&quot;).argv[1]))); s.listen(); c,_=s.accept(); c.recv(4096); time.sleep(5); c.close(); s.close()&#x27; &quot;$SLOW_PORT&quot; &gt; &quot;$BUILD_DIR/slow_backend.log&quot; 2&gt;&amp;1 &amp;
+slow_backend_pid=$!
+
+./build/server -p &quot;$SERVER_PORT&quot; -w 4 -t 2 -c &quot;$ROUTES_FILE&quot; -f \
+    &gt; &quot;$SERVER_LOG&quot; 2&gt;&amp;1 &amp;
+server_pid=$!
+
+ready=0
+for _ in $(seq 1 50); do
+    if ! kill -0 &quot;$server_pid&quot; 2&gt;/dev/null; then break; fi
+    if curl -sS --max-time 1 &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt;/dev/null 2&gt;&amp;1; then
+        ready=1
+        break
+    fi
+    sleep 0.1
+done
+if [[ &quot;$ready&quot; -ne 1 ]]; then
+    printf &#x27;서버가 시작되지 않았습니다. 로그: %s\n&#x27; &quot;$SERVER_LOG&quot; &gt;&amp;2
+    exit 2
+fi
+
+fd_before=&quot;&quot;
+if command -v lsof &gt;/dev/null 2&gt;&amp;1; then
+    fd_before=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+fi
+zombies_before=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+
+status_for() {
+    curl -sS --max-time 5 -o &quot;$BUILD_DIR/functional_body.tmp&quot; \
+        -w &#x27;%{http_code}&#x27; &quot;$@&quot; 2&gt;/dev/null || true
+}
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;정적 파일 서빙 시험 페이지&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;정적 파일 HTTP 200&#x27;
+else fail &quot;정적 파일 HTTP 200 (status=$status)&quot;; fi
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/missing-file&quot;)
+[[ &quot;$status&quot; == 404 ]] &amp;&amp; pass &#x27;없는 파일 HTTP 404&#x27; || fail &quot;없는 파일 HTTP 404 (status=$status)&quot;
+
+status=$(status_for --path-as-is &quot;http://127.0.0.1:$SERVER_PORT/../Makefile&quot;)
+[[ &quot;$status&quot; == 403 ]] &amp;&amp; pass &#x27;루트 밖 경로 HTTP 403&#x27; || fail &quot;루트 밖 경로 HTTP 403 (status=$status)&quot;
+
+bad_status=$(printf &#x27;GARBAGE\r\n\r\n&#x27; | nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$bad_status&quot; == 400 ]] &amp;&amp; pass &#x27;잘못된 요청 HTTP 400&#x27; || fail &quot;잘못된 요청 HTTP 400 (status=${bad_status:-없음})&quot;
+
+method_status=$(printf &#x27;PUT / HTTP/1.1\r\nHost: localhost\r\n\r\n&#x27; | nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$method_status&quot; == 501 ]] &amp;&amp; pass &#x27;지원하지 않는 메서드 HTTP 501&#x27; || fail &quot;지원하지 않는 메서드 HTTP 501 (status=${method_status:-없음})&quot;
+
+long_path=$(python3 -c &#x27;print(&quot;a&quot; * 3000)&#x27;)
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/$long_path&quot;)
+[[ &quot;$status&quot; == 414 ]] &amp;&amp; pass &#x27;긴 요청 대상 HTTP 414&#x27; || fail &quot;긴 요청 대상 HTTP 414 (status=$status)&quot;
+
+status=$(head -c 2000000 /dev/zero | curl -sS --max-time 5 -o /dev/null \
+    -w &#x27;%{http_code}&#x27; --data-binary @- &quot;http://127.0.0.1:$SERVER_PORT/echo&quot; 2&gt;/dev/null || true)
+[[ &quot;$status&quot; == 413 ]] &amp;&amp; pass &#x27;큰 본문 HTTP 413&#x27; || fail &quot;큰 본문 HTTP 413 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/cgi-bin/hello.sh?name=test&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;hello query=name=test&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;CGI GET&#x27;
+else fail &quot;CGI GET (status=$status)&quot;; fi
+
+status=$(status_for -d &#x27;a=1&amp;b=2&#x27; &quot;http://127.0.0.1:$SERVER_PORT/cgi-bin/echo.sh&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;a=1&amp;b=2&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;CGI POST&#x27;
+else fail &quot;CGI POST (status=$status)&quot;; fi
+
+curl -sS --http1.1 -v &quot;http://127.0.0.1:$SERVER_PORT/&quot; \
+    &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt; /dev/null 2&gt; &quot;$BUILD_DIR/keepalive.log&quot;
+if grep -q &#x27;Re-using existing connection&#x27; &quot;$BUILD_DIR/keepalive.log&quot;; then
+    pass &#x27;연결 유지로 요청 두 건&#x27;
+else fail &#x27;연결 유지로 요청 두 건&#x27;; fi
+
+proxy_a=$(curl -sS --max-time 5 &quot;http://127.0.0.1:$SERVER_PORT/api/&quot;)
+proxy_b=$(curl -sS --max-time 5 &quot;http://127.0.0.1:$SERVER_PORT/api/&quot;)
+if [[ &quot;$proxy_a&quot; == &#x27;backend A&#x27; &amp;&amp; &quot;$proxy_b&quot; == &#x27;backend B&#x27; ]]; then
+    pass &#x27;리버스 프록시 라운드 로빈&#x27;
+else fail &quot;리버스 프록시 라운드 로빈 (A=&#x27;$proxy_a&#x27;, B=&#x27;$proxy_b&#x27;)&quot;; fi
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/dead/&quot;)
+[[ &quot;$status&quot; == 502 ]] &amp;&amp; pass &#x27;꺼진 백엔드 HTTP 502&#x27; || fail &quot;꺼진 백엔드 HTTP 502 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/timeout/&quot;)
+[[ &quot;$status&quot; == 504 ]] &amp;&amp; pass &#x27;응답 없는 백엔드 HTTP 504&#x27; || fail &quot;응답 없는 백엔드 HTTP 504 (status=$status)&quot;
+
+connect_output=$(curl -k -v --max-time 3 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; https://example.com/ 2&gt;&amp;1 || true)
+if grep -q &#x27;response 501&#x27; &lt;&lt;&lt; &quot;$connect_output&quot;; then
+    pass &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;
+else fail &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;; fi
+
+https_status=$(printf &#x27;GET https://example.com/ HTTP/1.1\r\nHost: example.com\r\n\r\n&#x27; | \
+    nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$https_status&quot; == 400 ]] &amp;&amp; pass &#x27;https absolute-form 거부 HTTP 400&#x27; || fail &quot;https absolute-form 거부 HTTP 400 (status=${https_status:-없음})&quot;
+
+forward=$(curl -sS --max-time 5 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; &quot;http://127.0.0.1:$BACKEND_A_PORT/&quot;)
+[[ &quot;$forward&quot; == &#x27;backend A&#x27; ]] &amp;&amp; pass &#x27;포워드 프록시&#x27; || fail &quot;포워드 프록시 (body=&#x27;$forward&#x27;)&quot;
+
+concurrent_pids=()
+for i in $(seq 1 20); do
+    (curl -sS --max-time 5 -o /dev/null -w &#x27;%{http_code}&#x27; \
+        &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt; &quot;$BUILD_DIR/concurrent.$i&quot;) &amp;
+    concurrent_pids+=(&quot;$!&quot;)
+done
+concurrent_failed=0
+for pid in &quot;${concurrent_pids[@]}&quot;; do
+    wait &quot;$pid&quot; || concurrent_failed=1
+done
+for i in $(seq 1 20); do
+    [[ &quot;$(cat &quot;$BUILD_DIR/concurrent.$i&quot; 2&gt;/dev/null)&quot; == 200 ]] || concurrent_failed=1
+    rm -f &quot;$BUILD_DIR/concurrent.$i&quot;
+done
+if [[ &quot;$concurrent_failed&quot; -eq 0 ]]; then
+    pass &#x27;동시 클라이언트 20개&#x27;
+else fail &#x27;동시 클라이언트 20개&#x27;; fi
+
+# 느린 수신자가 큰 파일 전송 도중 연결을 닫아도 서버가 살아 있는지 봅니다.
+curl -sS --limit-rate 16k --max-time 0.2 \
+    &quot;http://127.0.0.1:$SERVER_PORT/large-test.bin&quot; -o /dev/null \
+    2&gt; &quot;$BUILD_DIR/client_abort.log&quot; || true
+sleep 0.2
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+[[ &quot;$status&quot; == 200 ]] &amp;&amp; pass &#x27;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존&#x27; || \
+    fail &quot;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+[[ &quot;$status&quot; == 200 ]] &amp;&amp; pass &#x27;극한 요청 뒤 서버 생존&#x27; || fail &quot;극한 요청 뒤 서버 생존 (status=$status)&quot;
+
+if [[ -n &quot;$fd_before&quot; ]]; then
+    fd_after=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+    [[ &quot;$fd_after&quot; == &quot;$fd_before&quot; ]] &amp;&amp; pass &#x27;요청 전후 파일 디스크립터 수 동일&#x27; || fail &quot;파일 디스크립터 수 (before=$fd_before after=$fd_after)&quot;
+else
+    printf &#x27;SKIP lsof 파일 디스크립터 확인 (lsof 없음)\n&#x27;
+fi
+
+zombies_after=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+[[ &quot;$zombies_after&quot; == &quot;$zombies_before&quot; ]] &amp;&amp; pass &#x27;좀비 프로세스 수 증가 없음&#x27; || fail &quot;좀비 프로세스 수 (before=$zombies_before after=$zombies_after)&quot;
+
+rm -f &quot;$BUILD_DIR/functional_body.tmp&quot;
+if [[ &quot;$failures&quot; -eq 0 ]]; then
+    printf &#x27;모든 기능 검사 통과\n&#x27;
+    exit 0
+fi
+printf &#x27;실패한 기능 검사: %s\n&#x27; &quot;$failures&quot;
+exit 1
+</code></pre></details></article></div></section><section><h2>모델 사이의 차이와 해석</h2><table class="line-table"><thead><tr><th>브랜치</th><th>담당 방식</th><th>주요 코드 위치</th></tr></thead><tbody><tr><td>stage6-sequential</td><td>main이 연결을 직접 처리</td><td>src/main.c:173–174</td></tr><tr><td>stage6-per-connection</td><td>연결마다 pthread 생성·분리, 종료 대기</td><td>src/main.c:44–65, 204–247, 250–274</td></tr><tr><td>stage6-thread-pool</td><td>연결을 큐에 제출하고 고정 worker가 처리</td><td>src/main.c:115–121, 184–194; src/pool.c:27–164</td></tr></tbody></table><p class="callout">포함 범위: 앱 소스 13개, 헤더 12개, Makefile 1개, 검사 스크립트 2개, 단위 검사 3개. 제외: 빌드 산출물과 .git 내부 파일. 소스 각 줄은 펼친 파일에서 확인할 수 있습니다. 행 번호는 각 브랜치 커밋 기준입니다.</p></section><script>
+const buttons=[...document.querySelectorAll('[data-model]')];
+buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));document.querySelectorAll('.model').forEach(p=>p.hidden=p.id!==`model-${b.dataset.model}`)}));
+</script></main></body></html>

@@ -1,0 +1,3038 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C 웹서버 · 프록시 코드로 읽는 교재</title>
+<style>
+:root{--bg:#10141c;--panel:#171e29;--panel2:#202a38;--line:#344256;--text:#e8edf5;--muted:#a8b4c7;--accent:#8fe4cc;--blue:#8cc8ff;--green:#77d7ab;--amber:#f2c879;--red:#f0a2a2}
+*{box-sizing:border-box} html{scroll-behavior:smooth;scroll-padding-top:24px} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+a{color:var(--blue)} code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} code{font-size:.92em;background:#0e131a;padding:.08em .35em;border-radius:4px;overflow-wrap:anywhere} .layout{max-width:1440px;margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;padding:28px 24px 80px} aside{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px} aside h2{font-size:15px;margin:0 0 10px} aside a{display:block;text-decoration:none;color:var(--muted);padding:5px 8px;border-radius:6px;font-size:13px} aside a:hover{background:var(--panel2);color:var(--text)} main{min-width:0} h1{font-size:clamp(28px,4vw,44px);line-height:1.25;margin:0 0 10px;letter-spacing:-.03em} h2{font-size:25px;margin:0} h3{font-size:19px;margin:0;line-height:1.4} h4{font-size:15px;margin:18px 0 8px} p{margin:8px 0} .hero{padding:32px;background:linear-gradient(135deg,#1a2d3b,#19222e 62%,#24352f);border:1px solid var(--line);border-radius:18px} .lead{font-size:18px;max-width:850px;color:#d0d9e6} .small,.muted{color:var(--muted);font-size:13px} .callout{padding:14px 16px;border-left:3px solid var(--accent);background:var(--panel);border-radius:0 9px 9px 0;margin:16px 0} .flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:18px 0} .flow-node{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13px} .flow-node:not(:last-child)::after{content:"→";color:var(--accent);margin-left:16px} .required-logic{background:var(--panel);border:1px solid #557263;border-radius:14px;padding:20px;margin:14px 0 18px} .required-logic h3{font-size:21px;margin:0 0 8px;color:var(--accent)} .required-lead{color:#d0d9e6} .essential-flow{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:14px 0} .essential-flow span{padding:6px 9px;border-radius:7px;background:var(--panel2);font-size:13px} .essential-flow b{color:var(--accent)} .line-lessons{display:grid;gap:9px;margin-top:14px} .line-lesson{padding:12px 13px;background:var(--panel2);border-radius:9px} .line-lesson p{font-size:14px;margin:7px 0 0} .code-line{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;justify-content:space-between} .code-line code{background:#0d1117;padding:5px 7px;overflow-wrap:anywhere} .code-line a{font-size:12px;white-space:nowrap} .stage{margin-top:38px;scroll-margin-top:20px} .stage-head{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px} .stage-no{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#18372f;color:var(--accent);font-size:20px;font-weight:700} .stage-head h2{margin:-4px 0 2px} .stage-head p{color:var(--muted);margin:3px 0 0} .eyebrow{font-size:12px;color:var(--accent);margin:0} .chapters{display:grid;gap:12px} .chapter{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;scroll-margin-top:20px} .chapter-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px} .chapter-head>div{display:flex;gap:10px;align-items:baseline;min-width:0} .chapter-id{font:700 14px ui-monospace,monospace;color:var(--accent);white-space:nowrap} .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;color:var(--muted);white-space:nowrap} .badge.done{color:var(--green);border-color:#39755d} .badge.current{color:var(--blue);border-color:#426a8d} .badge.built{color:var(--amber);border-color:#80693c} .badge.unverified{color:var(--red);border-color:#805455} .definition{margin-top:14px} .why{color:#c3cfde} .mapping{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px} .mapping th,.mapping td{text-align:left;vertical-align:top;padding:9px 10px;border-top:1px solid var(--line)} .mapping th{width:205px;color:var(--accent);font-weight:600} .inline-code{display:inline-block;background:#10161e;padding:6px 8px;max-width:100%} .handoff{margin-top:14px;padding:11px 13px;background:var(--panel2);border-radius:8px;color:#d2dbe7;font-size:14px} .codebox{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden} .codebox summary{cursor:pointer;padding:10px 12px;background:#1d2632;font-weight:600;font-size:14px} .kind{float:right;color:var(--muted);font-size:11px;font-weight:400;margin-left:10px} .source{padding:8px 12px 0;color:var(--muted);font-size:12px;overflow-wrap:anywhere} pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden;tab-size:4;padding:12px;margin:8px 0 0;background:#0d1117;color:#e0e7f0;font-size:12px;line-height:1.65} .table-scroll{overflow-x:auto} .gloss{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px} .gloss th,.gloss td{text-align:left;vertical-align:top;padding:8px;border-top:1px solid var(--line)} .gloss th{color:var(--accent)} .gloss td:first-child,.gloss td:nth-child(2){white-space:nowrap} .key{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:14px 0} .key div{padding:10px;background:var(--panel2);border-radius:8px;font-size:13px} footer{border-top:1px solid var(--line);margin-top:40px;padding-top:16px;color:var(--muted);font-size:13px} @media(max-width:900px){.layout{grid-template-columns:1fr;padding:14px}aside{position:relative;top:auto;max-height:none}aside nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}} @media(max-width:560px){.hero{padding:20px}.chapter{padding:14px}.chapter-head{display:block}.badge{display:inline-block;margin-top:8px}.chapter-head>div{align-items:flex-start;flex-direction:column;gap:2px}.mapping th{width:115px}body{font-size:15px}}
+</style></head><body><div class="layout">
+<aside><h2>교재 목차 · 1-1 → 9-4</h2><nav><a href="#stage-1">1단계 · 소켓 · 고정 응답</a><a href="#stage-2">2단계 · 연결 상태 머신</a><a href="#stage-3">3단계 · HTTP 파싱</a><a href="#stage-4">4단계 · 시스템 콜 · 소켓 옵션</a><a href="#stage-5">5단계 · 응답 조립 · 정적 파일 · CGI</a><a href="#stage-6">6단계 · 동시성</a><a href="#stage-7">7단계 · 프록시</a><a href="#stage-8">8단계 · 검증</a><a href="#stage-9">9단계 · 산출물</a></nav><p class="small">각 구간 제목을 누르면 해당 장으로 이동합니다.</p></aside>
+<main><header class="hero"><p class="eyebrow">자연어 의도 ↔ 코드 조각</p><h1>C 웹서버 · 프록시<br>코드로 읽는 교재</h1><p class="lead">“프로그램이 무엇을 하게 만들고 싶은가?”라는 자연어를 “어느 함수가 어떤 값을 받아 어떤 결과를 내는가?”라는 코드로 연결합니다. 구간을 따라가며 작은 기능이 전체 서버로 조립되는 순서를 읽습니다.</p>
+<div class="callout"><strong>현재 학습 위치: 6-2</strong><br>진행 지도 기준 시각: 2026-11-25 17:36 KST. 이 교재는 현재 위치를 대신 진도 완료로 바꾸지 않습니다. 구현·실험 기록과 학습 확인은 별도입니다.</div>
+<div class="flow" aria-label="웹서버의 큰 데이터 흐름"><div class="flow-node">클라이언트 입력</div><div class="flow-node">listen / accept</div><div class="flow-node">연결별 HTTP 읽기</div><div class="flow-node">HTTP 파싱</div><div class="flow-node">라우팅</div><div class="flow-node">정적 파일 · CGI · 프록시</div><div class="flow-node">응답 전송</div><div class="flow-node">연결 종료 · 자원 정리</div></div>
+<section class="callout"><h2>약어와 영어 원문</h2><p class="small">약어가 교재 본문에 처음 나올 때 뜻을 빠르게 확인할 수 있도록 모았습니다.</p><div class="table-scroll"><table class="gloss"><thead><tr><th>표기</th><th>영어 원문</th><th>여기서 뜻하는 것</th></tr></thead><tbody><tr><td><code>HTTP</code></td><td>Hypertext Transfer Protocol</td><td>웹 요청과 응답의 메시지 규칙</td></tr><tr><td><code>TCP</code></td><td>Transmission Control Protocol</td><td>연결을 맺고 바이트를 순서대로 전달하는 전송 규칙</td></tr><tr><td><code>IP</code></td><td>Internet Protocol</td><td>네트워크에서 장치와 목적지를 식별하는 주소 체계</td></tr><tr><td><code>IPv4</code></td><td>Internet Protocol version 4</td><td>32비트 주소를 사용하는 인터넷 프로토콜 4판</td></tr><tr><td><code>fd</code></td><td>file descriptor</td><td>프로세스가 열린 파일·소켓을 가리키는 정수 번호</td></tr><tr><td><code>URL</code></td><td>Uniform Resource Locator</td><td>네트워크 자원의 위치를 나타내는 주소</td></tr><tr><td><code>CGI</code></td><td>Common Gateway Interface</td><td>웹서버가 별도 프로그램을 실행해 결과를 받는 연결 규칙</td></tr><tr><td><code>MIME</code></td><td>Multipurpose Internet Mail Extensions</td><td>전송 데이터의 종류를 나타내는 미디어 형식 표기</td></tr><tr><td><code>POSIX</code></td><td>Portable Operating System Interface</td><td>운영체제 사이의 프로그램 인터페이스 표준</td></tr><tr><td><code>API</code></td><td>Application Programming Interface</td><td>프로그램이 다른 기능을 호출하는 약속</td></tr><tr><td><code>SIGPIPE</code></td><td>Signal: broken pipe</td><td>상대가 읽지 않는 연결에 쓰기를 시도할 때 관련 프로세스에 전달되는 신호</td></tr><tr><td><code>SIGINT</code></td><td>Signal: interrupt</td><td>터미널의 인터럽트 요청을 나타내는 신호</td></tr><tr><td><code>SIGTERM</code></td><td>Signal: terminate</td><td>프로세스에 종료를 요청하는 신호</td></tr><tr><td><code>EINTR</code></td><td>Interrupted system call error</td><td>시스템 호출이 신호에 의해 중단되었음을 나타내는 오류 이름</td></tr><tr><td><code>ASan</code></td><td>AddressSanitizer</td><td>메모리 접근 오류를 찾는 검사 도구</td></tr><tr><td><code>UBSan</code></td><td>UndefinedBehaviorSanitizer</td><td>C의 정의되지 않은 동작을 찾는 검사 도구</td></tr><tr><td><code>TSan</code></td><td>ThreadSanitizer</td><td>스레드 간 데이터 경쟁을 찾는 검사 도구</td></tr><tr><td><code>HTML</code></td><td>HyperText Markup Language</td><td>웹 문서의 구조를 표현하는 마크업 언어</td></tr></tbody></table></div></section>
+<div class="key"><div><strong>자연어</strong><br>원하는 결과를 동사와 대상으로 말합니다.</div><div><strong>코드</strong><br>함수 호출·자료형·조건문에 그 동작을 맡깁니다.</div><div><strong>모듈 연결</strong><br>앞 모듈의 결과가 다음 모듈의 입력이 됩니다.</div><div><strong>확인 상태</strong><br>코드가 존재하는 것과 학습자가 설명할 수 있는 것을 분리합니다.</div></div></header>
+<section class="callout"><strong>읽는 방법</strong><ol><li>정의를 읽어 이번 구간이 해결하는 서버 문제를 확인합니다.</li><li>“자연어 의도와 코드의 1:1 대응”에서 목표 문장, 코드 위치, 핵심 표현을 짝지어 봅니다.</li><li>접힌 코드 발췌를 열어 실제 프로젝트 코드와 출처를 확인합니다. 표시된 행 번호는 진행 지도에 기록된 시점의 위치입니다.</li><li>“앞 단계에서 받아 다음 단계로 넘기는 것”을 따라 모듈을 레고처럼 연결합니다.</li></ol><p class="small">코드는 전체 소스가 아니라 구간의 근거 발췌입니다. “실제 프로젝트 코드”, “별도 로컬 브랜치”, “실측 결과”, “설계 예시” 표기를 구분하세요.</p></section>
+<section class="stage" id="stage-1"><header class="stage-head"><div class="stage-no">1</div><div><p class="eyebrow">1단계</p><h2>소켓 · 고정 응답</h2><p>프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p></div></header><section class="required-logic" id="stage1-required-logic">
+<h3>필수 암기 로직 code</h3>
+<p class="required-lead">외울 대상은 문장 하나가 아니라, 각 코드 줄이 맡은 역할과 다음 줄에 넘기는 결과입니다. 아래는 현재 프로젝트의 여러 파일에서 뽑은 핵심 줄을 실행 흐름에 맞춰 다시 배열한 것입니다. 서로 다른 파일의 발췌를 모은 학습용 목록이므로, 하나의 붙여 넣기용 C 프로그램은 아닙니다.</p>
+<div class="essential-flow"><span>소켓 생성</span><b>→</b><span>주소 지정·대기</span><b>→</b><span>연결 수락</span><b>→</b><span>요청 읽기</span><b>→</b><span>응답 보내기</span><b>→</b><span>연결 닫기</span></div>
+<p class="muted">기본 호출은 <code>socket → bind → listen → accept → recv → send → close</code>입니다. 실제 프로젝트는 설정·오류 처리·스레드 풀·HTTP 파싱을 더해 이 기본 흐름을 여러 파일로 나눴습니다.</p><div class="callout"><strong>현재 프로젝트와 1단계의 차이:</strong> 현재 <code>main.c</code>는 <code>accept()</code> 뒤 <code>pool_submit(workers, conn_fd)</code>로 번호를 작업 대기열에 넘깁니다. 이 분배는 6-2에서 추가한 구조입니다. 1단계의 핵심은 연결 번호를 받아 요청을 읽고 응답한 뒤 닫는 흐름이며, 스레드 풀은 뒤 단계가 덧붙인 처리 방식입니다.</div>
+<div class="line-lessons">
+<article class="line-lesson"><div class="code-line"><code>int listen_fd = socket(AF_INET, SOCK_STREAM, 0);</code><a href="../src/net.c">src/net.c:19</a></div><p><strong>누가 누구에게 무엇을 하나:</strong> 서버 프로그램이 커널에 IPv4·TCP 소켓 생성을 요청합니다. 커널이 돌려준 소켓 번호를 서버 프로세스의 <code>listen_fd</code>에 저장합니다.</p><p><strong>다음 줄에 넘기는 값:</strong> 서버가 주소와 포트를 설정할 때 사용할 소켓 번호입니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>if (listen_fd &lt; 0) {</code><a href="../src/net.c">src/net.c:20</a></div><p>서버 프로그램이 <code>socket()</code>의 반환값을 검사합니다. 음수이면 소켓 생성이 실패한 것이므로 실패 이유를 기록하고 이 함수에서 실패를 돌려줍니다. 실패한 번호로 <code>bind()</code>를 호출하지 않게 막습니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>if (bind(listen_fd, (struct sockaddr *)&amp;addr, sizeof(addr)) &lt; 0) {</code><a href="../src/net.c">src/net.c:52</a></div><p>서버 프로그램이 커널에 <code>listen_fd</code>가 사용할 주소와 포트를 지정해 달라고 요청합니다. <code>addr</code>에 준비한 주소 정보가 요청의 대상이며, 성공하면 이 소켓은 해당 서버 주소를 사용합니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>if (listen(listen_fd, backlog) &lt; 0) {</code><a href="../src/net.c">src/net.c:59</a></div><p>서버 프로그램이 커널에 이 소켓으로 새 연결 요청을 받을 준비를 하라고 요청합니다. 연결 대기와 실제 연결 처리는 다음 <code>accept()</code> 호출에서 이어집니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>return listen_fd;</code><a href="../src/net.c">src/net.c:66</a></div><p><code>net_listen()</code>이 성공한 듣는 소켓 번호를 호출한 <code>main()</code>에 돌려줍니다. <code>main()</code>은 이 번호를 사용해 연결 요청을 기다립니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>int listen_fd = net_listen(cfg.host, cfg.port, cfg.backlog);</code><a href="../src/main.c">src/main.c:97</a></div><p><code>main()</code>이 설정에 저장된 서버 주소·포트·대기열 크기를 <code>net_listen()</code>에 전달합니다. 함수가 만든 듣는 소켓 번호는 다시 <code>listen_fd</code>에 저장됩니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);</code><a href="../src/main.c">src/main.c:139</a></div><p>서버 프로그램이 커널에 <code>listen_fd</code>로 기다리던 연결 하나를 수락해 달라고 요청합니다. 커널은 그 클라이언트와 통신할 새 번호를 돌려주고, 프로그램은 이를 <code>conn_fd</code>에 저장합니다. <code>listen_fd</code>는 다음 요청을 계속 기다리는 데 남습니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);</code><a href="../src/conn.c">src/conn.c:116</a></div><p>연결 처리 코드가 커널에 연결 소켓 <code>c.fd</code>에서 도착한 바이트를 읽어 달라고 요청합니다. 커널에서 읽은 바이트는 버퍼의 아직 사용하지 않은 위치에 기록되고, 읽은 바이트 수가 <code>n</code>에 담깁니다. 이 호출 한 번이 HTTP 요청 전체를 읽는다는 보장은 없으므로 코드가 다시 읽으며 누적합니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>c.rlen += (size_t)n;</code><a href="../src/conn.c">src/conn.c:133</a></div><p>이번 <code>recv()</code> 호출에서 읽은 바이트 수를 연결 버퍼의 누적 길이에 더합니다. 다음 번 읽기는 이 길이 뒤에 새 바이트를 이어 붙입니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>if (conn_has_header_end(c.rbuf, c.rlen)) {</code><a href="../src/conn.c">src/conn.c:137</a></div><p>서버 프로그램이 누적 버퍼에서 HTTP 헤더 끝을 나타내는 빈 줄을 찾습니다. 아직 찾지 못하면 요청 바이트를 더 읽고, 찾으면 파싱 단계로 넘깁니다. 이 검사는 헤더가 끝났다는 뜻이며 본문까지 모두 읽었다는 뜻은 아닙니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>static const char body[] = "hello
+";</code><a href="../src/conn.c">src/conn.c:284</a></div><p>연결 처리 코드가 응답 본문으로 보낼 바이트를 <code>body</code> 배열에 준비합니다. 이 배열은 클라이언트가 보낸 요청과 별개로 서버 프로그램이 만드는 응답 데이터입니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>if (resp_send_simple(c.fd, 200, "text/plain; charset=utf-8", body, sizeof(body) - 1, c.keep_alive) &lt; 0) {</code><a href="../src/conn.c">src/conn.c:285–286</a></div><p>연결 처리 코드가 응답 모듈에 연결 번호, 성공 상태, 본문 형식, 본문 배열, 본문 바이트 수, 연결 유지 여부를 전달합니다. 응답 모듈은 먼저 HTTP 상태 줄과 헤더를 보내고, 이어서 <code>body</code>의 바이트를 보냅니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>ssize_t n = send(fd, bytes + sent, len - sent, 0);</code><a href="../src/net.c">src/net.c:75</a></div><p><code>net_send_all()</code>이 커널에 아직 보내지 않은 응답 바이트를 연결 소켓으로 전달해 달라고 요청합니다. <code>send()</code>가 일부만 보냈다면 <code>sent</code>를 늘리고 반복해 나머지를 보냅니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>close(c.fd);</code><a href="../src/conn.c">src/conn.c:321</a></div><p>연결 처리 코드가 서버 프로세스가 보유한 연결 소켓 번호를 커널에 반납합니다. 이 연결에 대한 서버 프로그램의 처리가 끝납니다. 듣는 소켓 <code>listen_fd</code>와 연결 소켓 <code>c.fd</code>는 서로 다른 번호이며, 연결 종료 시 닫는 것은 여기서 처리한 연결 소켓입니다.</p></article>
+<article class="line-lesson"><div class="code-line"><code>close(listen_fd);</code><a href="../src/main.c">src/main.c:191</a></div><p>서버 종료 단계에서 <code>main()</code>이 커널에 듣는 소켓 번호를 반납합니다. 이 줄은 연결 하나를 마칠 때 닫는 <code>c.fd</code>와 다릅니다. 서버 전체를 멈출 때 <code>listen_fd</code>를 닫습니다.</p></article>
+</div>
+<div class="callout"><strong>암기 기준:</strong> <code>listen_fd</code>는 서버 주소에서 연결을 기다리는 소켓 번호입니다. <code>accept()</code>가 연결을 수락하면 별도의 <code>conn_fd</code>가 생기고, 서버는 그 번호로 해당 클라이언트의 요청을 읽고 응답합니다. 기본 동작을 말로 설명한 다음 각 동사를 코드 함수에 연결해 보세요.</div>
+</section><div class="chapters"><article class="chapter" id="1-1">
+<div class="chapter-head"><div><span class="chapter-id">1-1</span><h3>socket() · 파일 디스크립터</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · 서버 프로그램은 socket()을 호출해 커널에 IPv4·TCP 소켓 생성을 요청하고, 반환된 정수 번호를 listen_fd에 저장한다. 이 번호로 후속 bind()와 listen()을 연결한다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: listen_fd = 3 출력.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>socket()으로 IPv4 TCP 소켓 만들기</code><br><span class="muted">확인 위치: <code>src/net.c:17–22행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int listen_fd = socket(AF_INET, SOCK_STREAM, 0);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>listen_fd = 3 출력. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>socket()으로 IPv4 TCP 소켓 만들기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:17–22행</div>
+<pre><code>int net_listen(const char *host, int port, int backlog) {
+    // 커널에 IPv4와 TCP 바이트 스트림을 사용하는 소켓 생성을 요청합니다.
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd &lt; 0) {
+        server_log_errno(&quot;socket&quot;, errno);
+        return -1;</code></pre>
+</details>
+</article><article class="chapter" id="1-2">
+<div class="chapter-head"><div><span class="chapter-id">1-2</span><h3>setsockopt() · bind() · listen()</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · bind()는 서버가 사용할 주소와 포트를 소켓에 지정하고, listen()은 커널에 연결 요청을 받을 준비를 시킨다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 포트 8080이 LISTEN 상태.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>bind()와 listen()으로 서버 주소를 지정하고 대기 시작</code><br><span class="muted">확인 위치: <code>src/net.c:49–66행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">if (bind(listen_fd, (struct sockaddr *)&amp;addr, sizeof(addr)) &lt; 0) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>포트 8080이 LISTEN 상태. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>bind()와 listen()으로 서버 주소를 지정하고 대기 시작 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:49–66행</div>
+<pre><code>    }
+
+    // 커널에 listen_fd가 사용할 주소와 포트를 지정해 달라고 요청합니다.
+    if (bind(listen_fd, (struct sockaddr *)&amp;addr, sizeof(addr)) &lt; 0) {
+        server_log_errno(&quot;bind&quot;, errno);
+        close(listen_fd);
+        return -1;
+    }
+
+    // 커널에 이 소켓을 연결 요청 대기 상태로 바꾸고 대기 큐 크기를 설정하도록 요청합니다.
+    if (listen(listen_fd, backlog) &lt; 0) {
+        server_log_errno(&quot;listen&quot;, errno);
+        close(listen_fd);
+        return -1;
+    }
+
+    // 듣는 소켓 번호를 호출한 main()에 돌려줍니다.
+    return listen_fd;</code></pre>
+</details>
+</article><article class="chapter" id="1-3">
+<div class="chapter-head"><div><span class="chapter-id">1-3</span><h3>accept() · 듣는 소켓과 연결 소켓</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · accept()는 서버 프로그램이 듣는 소켓으로 들어온 연결 요청을 수락하고, 해당 클라이언트와 통신할 새 연결 소켓 번호를 돌려받는 단계다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 접속한 쪽의 IP와 포트 출력.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>accept()로 연결을 수락</code><br><span class="muted">확인 위치: <code>src/main.c:134–147행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>접속한 쪽의 IP와 포트 출력. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>accept()로 연결을 수락 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:134–147행</div>
+<pre><code>        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }</code></pre>
+</details><details class="codebox"><summary>클라이언트 주소 출력 후 연결 fd를 풀에 전달 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:172–188행</div>
+<pre><code>        // 클라이언트 주소 구조체에 담긴 IPv4 주소를 사람이 읽는 문자열로 바꿉니다.
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &amp;peer.sin_addr, ip, sizeof(ip)) == NULL) {
+            // 주소 변환에 실패하면 이 연결 소켓을 닫고 다음 연결을 기다립니다.
+            server_log_errno(&quot;inet_ntop&quot;, errno);
+            close(conn_fd);
+            continue;
+        }
+        // 새 연결 소켓 번호와 접속한 클라이언트 주소를 출력합니다.
+        server_log(&quot;accepted fd %d from %s:%d\n&quot;, conn_fd, ip,
+                   ntohs(peer.sin_port));
+
+        // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
+        if (pool_submit(workers, conn_fd) &lt; 0) {
+            server_log_errno(&quot;pool_submit&quot;, errno);
+            close(conn_fd);
+        }</code></pre>
+</details>
+</article><article class="chapter" id="1-4">
+<div class="chapter-head"><div><span class="chapter-id">1-4</span><h3>recv() · HTTP 요청의 실제 바이트</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · recv()는 연결 소켓에서 현재 도착한 요청 바이트를 읽는다. 한 번의 호출이 요청 전체를 준다고 가정하지 않고, 헤더 끝까지 읽도록 반복하는 구조를 만든다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: curl이 보낸 요청 줄과 헤더 출력.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>헤더 끝까지 recv()를 반복</code><br><span class="muted">확인 위치: <code>src/conn.c:97–146행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>curl이 보낸 요청 줄과 헤더 출력. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>헤더 끝까지 recv()를 반복 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:97–146행</div>
+<pre><code>            case CONN_READING: {
+                // 앞 요청을 처리하고도 다음 요청 바이트가 남았는지 먼저 확인합니다.
+                if (conn_has_header_end(c.rbuf, c.rlen)) {
+                    server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                               c.fd, c.rlen);
+                    conn_set_state(&amp;c, CONN_PARSING);
+                    break;
+                }
+
+                // 아직 비어 있는 버퍼 영역의 크기를 구해 넘칠 공간이 없도록 합니다.
+                size_t available = sizeof(c.rbuf) - c.rlen - 1;
+                if (available == 0) {
+                    server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                               c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
+                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                if (n &lt; 0) {
+                    if (errno == EINTR) break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (c.rlen &gt; 0) {
+                            resp_send_error(c.fd, 408);
+                        }
+                        server_log(&quot;fd %d: request read timed out\n&quot;, c.fd);
+                    } else {
+                        server_log_errno(&quot;recv&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else if (n == 0) {
+                    server_log(&quot;fd %d: peer closed\n&quot;, c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else {
+                    // 이번에 읽은 바이트 수를 누적하고 문자열 끝을 표시합니다.
+                    c.rlen += (size_t)n;
+                    c.rbuf[c.rlen] = &#x27;\0&#x27;;
+
+                    // HTTP 헤더 끝의 빈 줄이 도착했을 때만 요청 읽기를 마칩니다.
+                    if (conn_has_header_end(c.rbuf, c.rlen)) {
+                        server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                                   c.fd, c.rlen);
+                        conn_set_state(&amp;c, CONN_PARSING);
+                    } else if (c.rlen == sizeof(c.rbuf) - 1) {
+                        // 용량을 다 썼는데 끝 표시가 없으면 버퍼를 더 쓰지 않고 연결을 닫습니다.
+                        server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                                   c.fd);
+                        conn_set_state(&amp;c, CONN_CLOSING);
+                    }</code></pre>
+</details>
+</article><article class="chapter" id="1-5">
+<div class="chapter-head"><div><span class="chapter-id">1-5</span><h3>send() · 가장 작은 HTTP 응답</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · send()는 서버 프로그램이 연결 소켓을 통해 응답 바이트를 커널에 전달하도록 요청하는 단계다. 일부만 전달될 수 있으므로 지정한 바이트를 모두 보내는 반복도 연결한다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: curl이 200 OK와 hello를 받음.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>HTTP 상태 줄·헤더·본문 전송 (현재 공통 응답 구현)</code><br><span class="muted">확인 위치: <code>src/response.c:29–64행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">ssize_t n = send(fd, bytes + sent, len - sent, 0);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>curl이 200 OK와 hello를 받음. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>HTTP 상태 줄·헤더·본문 전송 (현재 공통 응답 구현) <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/response.c:29–64행</div>
+<pre><code>int resp_send_head(int fd, int status, const char *content_type,
+                   long content_length, int keep_alive) {
+    char date[64] = &quot;Thu, 01 Jan 1970 00:00:00 GMT&quot;;
+    time_t now = time(NULL);
+    struct tm utc;
+    if (now != (time_t)-1 &amp;&amp; gmtime_r(&amp;now, &amp;utc) != NULL) {
+        strftime(date, sizeof(date), &quot;%a, %d %b %Y %H:%M:%S GMT&quot;, &amp;utc);
+    }
+
+    char header[1024];
+    int length = snprintf(header, sizeof(header),
+                          &quot;HTTP/1.1 %d %s\r\n&quot;
+                          &quot;Content-Type: %s\r\n&quot;
+                          &quot;Content-Length: %ld\r\n&quot;
+                          &quot;Connection: %s\r\n&quot;
+                          &quot;Date: %s\r\n&quot;
+                          &quot;Server: c-webserver-proxy/1.0\r\n\r\n&quot;,
+                          status, resp_reason(status),
+                          content_type != NULL ? content_type : &quot;application/octet-stream&quot;,
+                          content_length, keep_alive ? &quot;keep-alive&quot; : &quot;close&quot;, date);
+    if (length &lt; 0 || (size_t)length &gt;= sizeof(header)) {
+        static const char fallback[] =
+            &quot;HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n&quot;;
+        return net_send_all(fd, fallback, sizeof(fallback) - 1);
+    }
+    return net_send_all(fd, header, (size_t)length);
+}
+
+int resp_send_simple(int fd, int status, const char *content_type,
+                     const char *body, size_t len, int keep_alive) {
+    if (len &gt; 0 &amp;&amp; body == NULL) return -1;
+    if (resp_send_head(fd, status, content_type, (long)len, keep_alive) &lt; 0) {
+        return -1;
+    }
+    return len &gt; 0 ? net_send_all(fd, body, len) : 0;
+}</code></pre>
+</details><details class="codebox"><summary>부분 전송에 대비해 지정 바이트를 모두 전송 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:70–88행</div>
+<pre><code>int net_send_all(int fd, const void *buf, size_t len) {
+    const char *bytes = buf;
+    size_t sent = 0;
+
+    while (sent &lt; len) {
+        ssize_t n = send(fd, bytes + sent, len - sent, 0);
+        if (n &lt; 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (n == 0) {
+            // 전송량이 늘지 않으면 더 진행할 수 없다는 오류로 돌려줍니다.
+            errno = EPIPE;
+            return -1;
+        }
+        sent += (size_t)n;
+    }
+
+    return 0;</code></pre>
+</details>
+</article><article class="chapter" id="1-6">
+<div class="chapter-head"><div><span class="chapter-id">1-6</span><h3>accept() 반복 · 닫는 순서와 TCP 상태</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · accept()를 반복해 다음 연결을 받는 구조와 종료 시 소켓을 닫는 순서를 다룬다. 연결을 한 번에 하나씩 처리하는 한계도 확인한다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 프로세스가 소켓을 만들고, 서버 주소에 묶고, 연결을 받아 HTTP 요청을 읽고 응답합니다. 이 단계는 웹서버의 최소 동작을 만듭니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: TIME_WAIT 관찰, 한 번에 한 연결만 처리하는 한계 확인.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>poll() 뒤 반복해서 연결을 수락</code><br><span class="muted">확인 위치: <code>src/main.c:124–147행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>TIME_WAIT 관찰, 한 번에 한 연결만 처리하는 한계 확인. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>poll() 뒤 반복해서 연결을 수락 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:124–147행</div>
+<pre><code>    // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
+    while (!g_stop) {
+        int ready = net_wait(listen_fd, POLLIN, 1000);
+        if (ready == 0) continue;
+        if (ready &lt; 0) {
+            if (errno == EINTR) continue;
+            server_log_errno(&quot;poll&quot;, errno);
+            continue;
+        }
+
+        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }</code></pre>
+</details><details class="codebox"><summary>종료할 때 listening socket과 worker pool 정리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:189–195행</div>
+<pre><code>    }
+
+    close(listen_fd);
+    pool_shutdown(workers);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-2"><header class="stage-head"><div class="stage-no">2</div><div><p class="eyebrow">2단계</p><h2>연결 상태 머신</h2><p>한 연결에서 읽기·해석·응답·닫기를 프로그램 상태로 나누고, 여러 함수에 역할을 배치합니다. 1단계의 한 덩어리 코드를 재사용 가능한 모듈로 바꿉니다.</p></div></header><div class="chapters"><article class="chapter" id="2-1">
+<div class="chapter-head"><div><span class="chapter-id">2-1</span><h3>파일 나누기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “파일 나누기”이라는 주제를 다룬다. 구현·확인 목표는 “main.c · net.c · conn.c로 나누고 동작은 그대로”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 한 연결에서 읽기·해석·응답·닫기를 프로그램 상태로 나누고, 여러 함수에 역할을 배치합니다. 1단계의 한 덩어리 코드를 재사용 가능한 모듈로 바꿉니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: main.c · net.c · conn.c로 나누고 동작은 그대로.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>네트워크 함수 선언</code><br><span class="muted">확인 위치: <code>include/net.h:1–18행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int net_listen(const char *host, int port, int backlog);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>main.c · net.c · conn.c로 나누고 동작은 그대로. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>네트워크 함수 선언 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">include/net.h:1–18행</div>
+<pre><code>#ifndef NET_H
+#define NET_H
+
+#include &lt;stddef.h&gt;
+
+// 이 헤더를 여러 번 포함해도 같은 선언이 중복 처리되지 않게 막습니다.
+
+// host와 port에 바인딩해 연결 요청을 기다리는 소켓을 만듭니다.
+// 성공하면 듣는 소켓의 번호를, 실패하면 -1을 반환합니다.
+int net_listen(const char *host, int port, int backlog);
+int net_connect(const char *host, const char *port, int timeout_ms);
+int net_send_all(int fd, const void *buf, size_t len);
+int net_set_timeouts(int fd, int seconds);
+int net_set_nonblock(int fd);
+int net_set_blocking(int fd);
+int net_wait(int fd, short events, int timeout_ms);
+
+#endif</code></pre>
+</details><details class="codebox"><summary>연결 처리 함수 선언 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">include/conn.h:1–11행</div>
+<pre><code>#ifndef CONN_H
+#define CONN_H
+
+#include &quot;config.h&quot;
+
+// 이 헤더를 여러 번 포함해도 같은 선언이 중복 처리되지 않게 막습니다.
+
+// 연결 하나에서 요청을 읽고 응답을 보낸 뒤 전달받은 소켓 번호를 닫습니다.
+void conn_handle(int fd, const char *client_ip, const struct config *cfg);
+
+#endif</code></pre>
+</details><details class="codebox"><summary>main()이 네트워크 준비와 연결 처리기를 조립 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:96–116행</div>
+<pre><code>    // net_listen()에 서버 주소와 포트, 대기 큐 크기를 전달해 듣는 소켓을 준비시킵니다.
+    int listen_fd = net_listen(cfg.host, cfg.port, cfg.backlog);
+    if (listen_fd &lt; 0) {
+        // net_listen()이 실패 이유를 이미 출력했으므로 서버를 종료합니다.
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+    if (net_set_nonblock(listen_fd) &lt; 0) {
+        server_log_errno(&quot;fcntl listen nonblock&quot;, errno);
+        close(listen_fd);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
+    server_log(&quot;listening on %s:%d (fd %d)\n&quot;, cfg.host, cfg.port, listen_fd);
+
+    // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
+    g_worker_config = &amp;cfg;
+    struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
+                                      serve_connection);</code></pre>
+</details>
+</article><article class="chapter" id="2-2">
+<div class="chapter-head"><div><span class="chapter-id">2-2</span><h3>상태를 이름으로 만들기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “상태를 이름으로 만들기”이라는 주제를 다룬다. 구현·확인 목표는 “enum conn_state와 상태 전이 기록”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 한 연결에서 읽기·해석·응답·닫기를 프로그램 상태로 나누고, 여러 함수에 역할을 배치합니다. 1단계의 한 덩어리 코드를 재사용 가능한 모듈로 바꿉니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: enum conn_state와 상태 전이 기록.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>연결 애플리케이션 상태 열거와 상태 기록</code><br><span class="muted">확인 위치: <code>src/conn.c:17–60행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">enum conn_state {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>enum conn_state와 상태 전이 기록. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>연결 애플리케이션 상태 열거와 상태 기록 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:17–60행</div>
+<pre><code>// 이 값들은 TCP 상태가 아니라 서버 프로그램이 관리하는 처리 단계입니다.
+enum conn_state {
+    CONN_READING,
+    CONN_PARSING,
+    CONN_ROUTING,
+    CONN_RESPONDING,
+    CONN_KEEPALIVE_CHECK,
+    CONN_CLOSING,
+    CONN_CLOSED
+};
+
+// 연결 하나를 처리하는 동안 필요한 번호, 현재 단계, 요청 저장 공간입니다.
+struct conn {
+    int fd;
+    enum conn_state state;
+    char rbuf[8192];
+    size_t rlen;
+    size_t request_len;
+    int keep_alive;
+    int response_sent;
+    char *body;
+    size_t body_len;
+};
+
+// 상태 출력에 사용할 단계 이름을 돌려줍니다.
+static const char *conn_state_name(enum conn_state state) {
+    switch (state) {
+        case CONN_READING: return &quot;READING&quot;;
+        case CONN_PARSING: return &quot;PARSING&quot;;
+        case CONN_ROUTING: return &quot;ROUTING&quot;;
+        case CONN_RESPONDING: return &quot;RESPONDING&quot;;
+        case CONN_KEEPALIVE_CHECK: return &quot;KEEPALIVE_CHECK&quot;;
+        case CONN_CLOSING: return &quot;CLOSING&quot;;
+        case CONN_CLOSED: return &quot;CLOSED&quot;;
+    }
+    return &quot;UNKNOWN&quot;;
+}
+
+// 단계가 바뀌면 서버 터미널의 오류 출력(stderr)에 전환을 기록합니다.
+static void conn_set_state(struct conn *c, enum conn_state next) {
+    server_log(&quot;fd %d: %s -&gt; %s\n&quot;, c-&gt;fd,
+               conn_state_name(c-&gt;state), conn_state_name(next));
+    c-&gt;state = next;
+}</code></pre>
+</details><details class="codebox"><summary>상태 머신이 요청 바이트를 읽는 분기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:94–129행</div>
+<pre><code>    // 현재 단계가 닫힘에 도달할 때까지 이 연결의 처리 단계를 진행합니다.
+    while (c.state != CONN_CLOSED) {
+        switch (c.state) {
+            case CONN_READING: {
+                // 앞 요청을 처리하고도 다음 요청 바이트가 남았는지 먼저 확인합니다.
+                if (conn_has_header_end(c.rbuf, c.rlen)) {
+                    server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                               c.fd, c.rlen);
+                    conn_set_state(&amp;c, CONN_PARSING);
+                    break;
+                }
+
+                // 아직 비어 있는 버퍼 영역의 크기를 구해 넘칠 공간이 없도록 합니다.
+                size_t available = sizeof(c.rbuf) - c.rlen - 1;
+                if (available == 0) {
+                    server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                               c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
+                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                if (n &lt; 0) {
+                    if (errno == EINTR) break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (c.rlen &gt; 0) {
+                            resp_send_error(c.fd, 408);
+                        }
+                        server_log(&quot;fd %d: request read timed out\n&quot;, c.fd);
+                    } else {
+                        server_log_errno(&quot;recv&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else if (n == 0) {
+                    server_log(&quot;fd %d: peer closed\n&quot;, c.fd);</code></pre>
+</details>
+</article><article class="chapter" id="2-3">
+<div class="chapter-head"><div><span class="chapter-id">2-3</span><h3>빈 줄이 올 때까지 읽기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “빈 줄이 올 때까지 읽기”이라는 주제를 다룬다. 구현·확인 목표는 “쪼개 보낸 요청에도 응답”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 한 연결에서 읽기·해석·응답·닫기를 프로그램 상태로 나누고, 여러 함수에 역할을 배치합니다. 1단계의 한 덩어리 코드를 재사용 가능한 모듈로 바꿉니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 쪼개 보낸 요청에도 응답.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>CRLFCRLF가 올 때까지 제한된 버퍼에 누적</code><br><span class="muted">확인 위치: <code>src/conn.c:97–146행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">case CONN_READING: {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>쪼개 보낸 요청에도 응답. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>CRLFCRLF가 올 때까지 제한된 버퍼에 누적 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:97–146행</div>
+<pre><code>            case CONN_READING: {
+                // 앞 요청을 처리하고도 다음 요청 바이트가 남았는지 먼저 확인합니다.
+                if (conn_has_header_end(c.rbuf, c.rlen)) {
+                    server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                               c.fd, c.rlen);
+                    conn_set_state(&amp;c, CONN_PARSING);
+                    break;
+                }
+
+                // 아직 비어 있는 버퍼 영역의 크기를 구해 넘칠 공간이 없도록 합니다.
+                size_t available = sizeof(c.rbuf) - c.rlen - 1;
+                if (available == 0) {
+                    server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                               c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
+                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                if (n &lt; 0) {
+                    if (errno == EINTR) break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (c.rlen &gt; 0) {
+                            resp_send_error(c.fd, 408);
+                        }
+                        server_log(&quot;fd %d: request read timed out\n&quot;, c.fd);
+                    } else {
+                        server_log_errno(&quot;recv&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else if (n == 0) {
+                    server_log(&quot;fd %d: peer closed\n&quot;, c.fd);
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else {
+                    // 이번에 읽은 바이트 수를 누적하고 문자열 끝을 표시합니다.
+                    c.rlen += (size_t)n;
+                    c.rbuf[c.rlen] = &#x27;\0&#x27;;
+
+                    // HTTP 헤더 끝의 빈 줄이 도착했을 때만 요청 읽기를 마칩니다.
+                    if (conn_has_header_end(c.rbuf, c.rlen)) {
+                        server_log(&quot;fd %d: request data available (%zu bytes)\n&quot;,
+                                   c.fd, c.rlen);
+                        conn_set_state(&amp;c, CONN_PARSING);
+                    } else if (c.rlen == sizeof(c.rbuf) - 1) {
+                        // 용량을 다 썼는데 끝 표시가 없으면 버퍼를 더 쓰지 않고 연결을 닫습니다.
+                        server_log(&quot;fd %d: request headers exceed buffer capacity\n&quot;,
+                                   c.fd);
+                        conn_set_state(&amp;c, CONN_CLOSING);
+                    }</code></pre>
+</details><details class="codebox"><summary>요청 헤더가 덜 오면 INCOMPLETE 반환 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/http.c:47–54행</div>
+<pre><code>// 3-1 요청 줄에 이어 헤더 줄들을 배열에 담습니다.
+enum http_result http_parse(const char *buf, size_t len, struct http_request *req) {
+    if (buf == NULL || req == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (!has_header_end(buf, len)) {
+        return HTTP_INCOMPLETE;
+    }</code></pre>
+</details>
+</article><article class="chapter" id="2-4">
+<div class="chapter-head"><div><span class="chapter-id">2-4</span><h3>끝까지 보내기와 연결 유지의 뼈대</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “끝까지 보내기와 연결 유지의 뼈대”이라는 주제를 다룬다. 구현·확인 목표는 “net_send_all과 KEEPALIVE_CHECK 자리”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 한 연결에서 읽기·해석·응답·닫기를 프로그램 상태로 나누고, 여러 함수에 역할을 배치합니다. 1단계의 한 덩어리 코드를 재사용 가능한 모듈로 바꿉니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: net_send_all과 KEEPALIVE_CHECK 자리.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>net_send_all()</code><br><span class="muted">확인 위치: <code>src/net.c:70–88행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int net_send_all(int fd, const void *buf, size_t len) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>net_send_all과 KEEPALIVE_CHECK 자리. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>net_send_all() <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:70–88행</div>
+<pre><code>int net_send_all(int fd, const void *buf, size_t len) {
+    const char *bytes = buf;
+    size_t sent = 0;
+
+    while (sent &lt; len) {
+        ssize_t n = send(fd, bytes + sent, len - sent, 0);
+        if (n &lt; 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (n == 0) {
+            // 전송량이 늘지 않으면 더 진행할 수 없다는 오류로 돌려줍니다.
+            errno = EPIPE;
+            return -1;
+        }
+        sent += (size_t)n;
+    }
+
+    return 0;</code></pre>
+</details><details class="codebox"><summary>응답 뒤 keep-alive 여부와 다음 요청 버퍼 정리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:297–315행</div>
+<pre><code>            case CONN_KEEPALIVE_CHECK:
+                if (!c.keep_alive) {
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 방금 처리한 요청만 버리고, 다음 요청 바이트는 버퍼 앞으로 당깁니다.
+                if (c.request_len &gt; c.rlen) {
+                    c.request_len = c.rlen;
+                }
+                c.rlen -= c.request_len;
+                memmove(c.rbuf, c.rbuf + c.request_len, c.rlen);
+                c.rbuf[c.rlen] = &#x27;\0&#x27;;
+                free(c.body);
+                c.body = NULL;
+                c.body_len = 0;
+                c.response_sent = 0;
+                conn_set_state(&amp;c, CONN_READING);
+                break;</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-3"><header class="stage-head"><div class="stage-no">3</div><div><p class="eyebrow">3단계</p><h2>HTTP 파싱</h2><p>받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p></div></header><div class="chapters"><article class="chapter" id="3-1">
+<div class="chapter-head"><div><span class="chapter-id">3-1</span><h3>요청 줄</h3></div><span class="badge done">학습 확인 완료</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “요청 줄”이라는 주제를 다룬다. 구현·확인 목표는 “메서드 · 대상 · 버전으로 나누기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 메서드 · 대상 · 버전으로 나누기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>요청 줄에서 method·target·version 분리</code><br><span class="muted">확인 위치: <code>src/http.c:47–109행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">size_t method_len = first_space;</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>메서드 · 대상 · 버전으로 나누기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>요청 줄에서 method·target·version 분리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/http.c:47–109행</div>
+<pre><code>// 3-1 요청 줄에 이어 헤더 줄들을 배열에 담습니다.
+enum http_result http_parse(const char *buf, size_t len, struct http_request *req) {
+    if (buf == NULL || req == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (!has_header_end(buf, len)) {
+        return HTTP_INCOMPLETE;
+    }
+
+    // 요청 줄의 끝을 찾습니다. 입력 버퍼는 수정하지 않습니다.
+    size_t line_end = 0;
+    while (line_end + 1 &lt; len &amp;&amp;
+           !(buf[line_end] == &#x27;\r&#x27; &amp;&amp; buf[line_end + 1] == &#x27;\n&#x27;)) {
+        line_end++;
+    }
+    if (line_end + 1 &gt;= len) {
+        return HTTP_BAD_REQUEST;
+    }
+
+    // 요청 줄에는 method, target, version 사이의 공백이 정확히 두 개 있어야 합니다.
+    size_t first_space = line_end;
+    size_t second_space = line_end;
+    for (size_t i = 0; i &lt; line_end; i++) {
+        if (buf[i] == &#x27; &#x27;) {
+            if (first_space == line_end) {
+                first_space = i;
+            } else if (second_space == line_end) {
+                second_space = i;
+            } else {
+                return HTTP_BAD_REQUEST;
+            }
+        }
+    }
+    if (first_space == 0 || second_space == line_end ||
+        second_space == first_space + 1 || second_space + 1 == line_end) {
+        return HTTP_BAD_REQUEST;
+    }
+
+    size_t method_len = first_space;
+    size_t target_start = first_space + 1;
+    size_t target_len = second_space - target_start;
+    size_t version_start = second_space + 1;
+    size_t version_len = line_end - version_start;
+
+    if (target_len &gt;= sizeof(req-&gt;target)) {
+        return HTTP_URI_TOO_LONG;
+    }
+    if (!((method_len == 3 &amp;&amp; memcmp(buf, &quot;GET&quot;, 3) == 0) ||
+          (method_len == 4 &amp;&amp; memcmp(buf, &quot;POST&quot;, 4) == 0))) {
+        return HTTP_NOT_IMPLEMENTED;
+    }
+    if (!((version_len == 8 &amp;&amp; memcmp(buf + version_start, &quot;HTTP/1.1&quot;, 8) == 0) ||
+          (version_len == 8 &amp;&amp; memcmp(buf + version_start, &quot;HTTP/1.0&quot;, 8) == 0))) {
+        return HTTP_VERSION_NOT_SUPPORTED;
+    }
+
+    memset(req, 0, sizeof(*req));
+    memcpy(req-&gt;method, buf, method_len);
+    req-&gt;method[method_len] = &#x27;\0&#x27;;
+    memcpy(req-&gt;target, buf + target_start, target_len);
+    req-&gt;target[target_len] = &#x27;\0&#x27;;
+    memcpy(req-&gt;version, buf + version_start, version_len);
+    req-&gt;version[version_len] = &#x27;\0&#x27;;</code></pre>
+</details>
+</article><article class="chapter" id="3-2">
+<div class="chapter-head"><div><span class="chapter-id">3-2</span><h3>헤더</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “헤더”이라는 주제를 다룬다. 구현·확인 목표는 “이름: 값 줄들을 배열에 담기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 이름: 값 줄들을 배열에 담기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>헤더 이름과 값을 파싱하고 HTTP/1.1 Host 검사</code><br><span class="muted">확인 위치: <code>src/http.c:111–168행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">req-&gt;header_len = end + 2;</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>이름: 값 줄들을 배열에 담기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>헤더 이름과 값을 파싱하고 HTTP/1.1 Host 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/http.c:111–168행</div>
+<pre><code>    // 요청 줄 다음부터 빈 줄 전까지 한 헤더씩 읽습니다.
+    size_t pos = line_end + 2;
+    while (pos + 1 &lt; len) {
+        size_t end = pos;
+        while (end + 1 &lt; len &amp;&amp; !(buf[end] == &#x27;\r&#x27; &amp;&amp; buf[end + 1] == &#x27;\n&#x27;)) {
+            end++;
+        }
+        if (end + 1 &gt;= len) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (end == pos) {
+            req-&gt;header_len = end + 2;
+            break;
+        }
+
+        size_t colon = pos;
+        while (colon &lt; end &amp;&amp; buf[colon] != &#x27;:&#x27;) {
+            colon++;
+        }
+        if (colon == pos || colon == end) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (req-&gt;nheaders &gt;= (int)(sizeof(req-&gt;headers) / sizeof(req-&gt;headers[0]))) {
+            return HTTP_HEADER_TOO_LARGE;
+        }
+
+        size_t name_len = colon - pos;
+        size_t value_start = colon + 1;
+        size_t value_end = end;
+        while (value_start &lt; value_end &amp;&amp;
+               (buf[value_start] == &#x27; &#x27; || buf[value_start] == &#x27;\t&#x27;)) {
+            value_start++;
+        }
+        while (value_end &gt; value_start &amp;&amp;
+               (buf[value_end - 1] == &#x27; &#x27; || buf[value_end - 1] == &#x27;\t&#x27;)) {
+            value_end--;
+        }
+        size_t value_len = value_end - value_start;
+        struct http_header *header = &amp;req-&gt;headers[req-&gt;nheaders];
+        if (name_len &gt;= sizeof(header-&gt;name) || value_len &gt;= sizeof(header-&gt;value)) {
+            return HTTP_HEADER_TOO_LARGE;
+        }
+        memcpy(header-&gt;name, buf + pos, name_len);
+        header-&gt;name[name_len] = &#x27;\0&#x27;;
+        memcpy(header-&gt;value, buf + value_start, value_len);
+        header-&gt;value[value_len] = &#x27;\0&#x27;;
+        req-&gt;nheaders++;
+        pos = end + 2;
+    }
+    if (req-&gt;header_len == 0) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (strcmp(req-&gt;version, &quot;HTTP/1.1&quot;) == 0 &amp;&amp;
+        http_header_get(req, &quot;Host&quot;) == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+    if (http_header_get(req, &quot;Transfer-Encoding&quot;) != NULL) {
+        return HTTP_NOT_IMPLEMENTED;</code></pre>
+</details>
+</article><article class="chapter" id="3-3">
+<div class="chapter-head"><div><span class="chapter-id">3-3</span><h3>Content-Length와 본문</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · Content-Length는 HTTP 요청 본문에 몇 바이트가 있는지 나타내며, 파서는 이 값을 제한 검사와 본문 읽기 단계에 넘긴다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: POST 본문을 정확한 바이트 수만큼 읽기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>Content-Length와 본문 크기 제한 검사</code><br><span class="muted">확인 위치: <code>src/http.c:170–190행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">const char *content_length = http_header_get(req, &quot;Content-Length&quot;);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>POST 본문을 정확한 바이트 수만큼 읽기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>Content-Length와 본문 크기 제한 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/http.c:170–190행</div>
+<pre><code>    const char *content_length = http_header_get(req, &quot;Content-Length&quot;);
+    if (content_length != NULL) {
+        for (const char *digit = content_length; *digit != &#x27;\0&#x27;; digit++) {
+            if (*digit &lt; &#x27;0&#x27; || *digit &gt; &#x27;9&#x27;) {
+                return HTTP_BAD_REQUEST;
+            }
+        }
+        errno = 0;
+        char *number_end = NULL;
+        long body_length = strtol(content_length, &amp;number_end, 10);
+        if (errno == ERANGE || number_end == content_length ||
+            *number_end != &#x27;\0&#x27; || body_length &lt; 0) {
+            return HTTP_BAD_REQUEST;
+        }
+        if (body_length &gt; HTTP_MAX_BODY) {
+            return HTTP_PAYLOAD_TOO_LARGE;
+        }
+        req-&gt;content_length = body_length;
+    }
+    return HTTP_OK;
+}</code></pre>
+</details><details class="codebox"><summary>정해진 본문 바이트 수만큼 recv() <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:157–223행</div>
+<pre><code>                if (result == HTTP_OK) {
+                    c.request_len = req.header_len + (size_t)req.content_length;
+                    const char *connection = http_header_get(&amp;req, &quot;Connection&quot;);
+                    c.keep_alive = strcmp(req.version, &quot;HTTP/1.1&quot;) == 0;
+                    if (connection != NULL) {
+                        if (strcasecmp(connection, &quot;close&quot;) == 0) {
+                            c.keep_alive = 0;
+                        } else if (strcasecmp(connection, &quot;keep-alive&quot;) == 0) {
+                            c.keep_alive = 1;
+                        }
+                    }
+                    req.keep_alive = c.keep_alive;
+                    server_log(&quot;fd %d: request %s %s %s; headers=%d bytes=%zu\n&quot;,
+                               c.fd, req.method, req.target, req.version,
+                               req.nheaders, req.header_len);
+                    if (req.content_length &gt; 0) {
+                        size_t expected = (size_t)req.content_length;
+                        c.body = malloc(expected + 1);
+                        if (c.body == NULL) {
+                            server_log_errno(&quot;malloc request body&quot;, errno);
+                            conn_set_state(&amp;c, CONN_CLOSING);
+                            break;
+                        }
+
+                        // 헤더와 함께 이미 받은 본문 바이트를 새 저장 공간으로 옮깁니다.
+                        size_t received = c.rlen - req.header_len;
+                        if (received &gt; expected) {
+                            received = expected;
+                        }
+                        memcpy(c.body, c.rbuf + req.header_len, received);
+
+                        // Content-Length가 가리키는 나머지 바이트만 더 받습니다.
+                        while (received &lt; expected) {
+                            ssize_t n = recv(c.fd, c.body + received,
+                                             expected - received, 0);
+                            if (n &lt; 0) {
+                                if (errno == EINTR) continue;
+                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    resp_send_error(c.fd, 408);
+                                } else {
+                                    server_log_errno(&quot;recv body&quot;, errno);
+                                }
+                                free(c.body);
+                                c.body = NULL;
+                                conn_set_state(&amp;c, CONN_CLOSING);
+                                break;
+                            }
+                            if (n == 0) {
+                                server_log(&quot;fd %d: peer closed during request body\n&quot;,
+                                           c.fd);
+                                free(c.body);
+                                c.body = NULL;
+                                conn_set_state(&amp;c, CONN_CLOSING);
+                                break;
+                            }
+                            received += (size_t)n;
+                        }
+                        if (c.state == CONN_CLOSING) {
+                            break;
+                        }
+                        c.body[received] = &#x27;\0&#x27;;
+                        c.body_len = received;
+                        server_log(&quot;fd %d: request body bytes=%zu\n&quot;,
+                                   c.fd, received);
+                    }
+                    conn_set_state(&amp;c, CONN_ROUTING);
+                } else {</code></pre>
+</details>
+</article><article class="chapter" id="3-4">
+<div class="chapter-head"><div><span class="chapter-id">3-4</span><h3>연결 유지(keep-alive) 결정</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “연결 유지(keep-alive) 결정”이라는 주제를 다룬다. 구현·확인 목표는 “응답 뒤 닫을지 다음 요청을 기다릴지”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 응답 뒤 닫을지 다음 요청을 기다릴지.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>HTTP 버전과 Connection 헤더로 연결 유지 여부 결정</code><br><span class="muted">확인 위치: <code>src/conn.c:157–169행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">c.keep_alive = strcmp(req.version, &quot;HTTP/1.1&quot;) == 0;</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>응답 뒤 닫을지 다음 요청을 기다릴지. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>HTTP 버전과 Connection 헤더로 연결 유지 여부 결정 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:157–169행</div>
+<pre><code>                if (result == HTTP_OK) {
+                    c.request_len = req.header_len + (size_t)req.content_length;
+                    const char *connection = http_header_get(&amp;req, &quot;Connection&quot;);
+                    c.keep_alive = strcmp(req.version, &quot;HTTP/1.1&quot;) == 0;
+                    if (connection != NULL) {
+                        if (strcasecmp(connection, &quot;close&quot;) == 0) {
+                            c.keep_alive = 0;
+                        } else if (strcasecmp(connection, &quot;keep-alive&quot;) == 0) {
+                            c.keep_alive = 1;
+                        }
+                    }
+                    req.keep_alive = c.keep_alive;
+                    server_log(&quot;fd %d: request %s %s %s; headers=%d bytes=%zu\n&quot;,</code></pre>
+</details><details class="codebox"><summary>처리한 요청을 버리고 남은 바이트 유지 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:297–315행</div>
+<pre><code>            case CONN_KEEPALIVE_CHECK:
+                if (!c.keep_alive) {
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                    break;
+                }
+
+                // 방금 처리한 요청만 버리고, 다음 요청 바이트는 버퍼 앞으로 당깁니다.
+                if (c.request_len &gt; c.rlen) {
+                    c.request_len = c.rlen;
+                }
+                c.rlen -= c.request_len;
+                memmove(c.rbuf, c.rbuf + c.request_len, c.rlen);
+                c.rbuf[c.rlen] = &#x27;\0&#x27;;
+                free(c.body);
+                c.body = NULL;
+                c.body_len = 0;
+                c.response_sent = 0;
+                conn_set_state(&amp;c, CONN_READING);
+                break;</code></pre>
+</details>
+</article><article class="chapter" id="3-5">
+<div class="chapter-head"><div><span class="chapter-id">3-5</span><h3>파서 단위 테스트</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “파서 단위 테스트”이라는 주제를 다룬다. 구현·확인 목표는 “make test로 http_parse만 검사”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 받은 바이트를 HTTP 요청의 의미 있는 필드로 나눕니다. 파서는 다음 처리기가 메서드·경로·헤더·본문을 사용할 수 있도록 입력을 구조화합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: make test로 http_parse만 검사.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>HTTP parser 단위 검사</code><br><span class="muted">확인 위치: <code>tests/test_http.c:1–91행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">return http_parse(text, strlen(text), req);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>make test로 http_parse만 검사. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>HTTP parser 단위 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">tests/test_http.c:1–91행</div>
+<pre><code>#include &quot;http.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+static enum http_result parse(const char *text, struct http_request *req) {
+    return http_parse(text, strlen(text), req);
+}
+
+static void test_valid_get_and_trimmed_header(void) {
+    const char *text = &quot;GET /a HTTP/1.1\r\nHost: example.test\r\nX-Test:  \thi \t \r\n\r\n&quot;;
+    struct http_request req;
+    assert(parse(text, &amp;req) == HTTP_OK);
+    assert(strcmp(req.method, &quot;GET&quot;) == 0);
+    assert(strcmp(req.target, &quot;/a&quot;) == 0);
+    assert(strcmp(http_header_get(&amp;req, &quot;x-tEsT&quot;), &quot;hi&quot;) == 0);
+}
+
+static void test_post_content_length(void) {
+    const char *text = &quot;POST /echo HTTP/1.1\r\nHost: example.test\r\nContent-Length: 7\r\n\r\na=1&amp;b=2&quot;;
+    struct http_request req;
+    assert(parse(text, &amp;req) == HTTP_OK);
+    assert(req.content_length == 7);
+    assert(req.header_len == strlen(text) - 7);
+}
+
+static void test_incomplete_and_bad_request_line(void) {
+    struct http_request req;
+    const char *incomplete = &quot;GET / HTTP/1.1\r\nHost: x\r\n&quot;;
+    assert(http_parse(incomplete, strlen(incomplete), &amp;req) == HTTP_INCOMPLETE);
+    assert(parse(&quot;GET /only-one-space\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+}
+
+static void test_unsupported_method_and_version(void) {
+    struct http_request req;
+    assert(parse(&quot;PUT / HTTP/1.1\r\nHost: x\r\n\r\n&quot;, &amp;req) == HTTP_NOT_IMPLEMENTED);
+    assert(parse(&quot;GET / HTTP/9.9\r\nHost: x\r\n\r\n&quot;, &amp;req) == HTTP_VERSION_NOT_SUPPORTED);
+}
+
+static void test_long_target_and_too_many_headers(void) {
+    struct http_request req;
+    char *long_target = malloc(2100);
+    assert(long_target != NULL);
+    const char *prefix = &quot;GET /&quot;;
+    size_t pos = strlen(prefix);
+    memcpy(long_target, prefix, pos);
+    memset(long_target + pos, &#x27;a&#x27;, 2048);
+    pos += 2048;
+    const char *suffix = &quot; HTTP/1.1\r\nHost: x\r\n\r\n&quot;;
+    size_t suffix_len = strlen(suffix);
+    memcpy(long_target + pos, suffix, suffix_len);
+    pos += suffix_len;
+    assert(http_parse(long_target, pos, &amp;req) == HTTP_URI_TOO_LONG);
+    free(long_target);
+
+    char headers[1200] = &quot;GET / HTTP/1.1\r\nHost: x\r\n&quot;;
+    for (int i = 0; i &lt; 32; i++) {
+        strcat(headers, &quot;X: y\r\n&quot;);
+    }
+    strcat(headers, &quot;\r\n&quot;);
+    assert(parse(headers, &amp;req) == HTTP_HEADER_TOO_LARGE);
+}
+
+static void test_bad_header_and_content_length(void) {
+    struct http_request req;
+    assert(parse(&quot;GET / HTTP/1.1\r\nHost x\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: abc\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 2000000\r\n\r\n&quot;, &amp;req) == HTTP_PAYLOAD_TOO_LARGE);
+}
+
+static void test_host_and_transfer_encoding(void) {
+    struct http_request req;
+    assert(parse(&quot;GET / HTTP/1.1\r\nX: y\r\n\r\n&quot;, &amp;req) == HTTP_BAD_REQUEST);
+    assert(parse(&quot;GET / HTTP/1.1\r\nhOsT: example.test\r\n\r\n&quot;, &amp;req) == HTTP_OK);
+    assert(parse(&quot;POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n&quot;, &amp;req) == HTTP_NOT_IMPLEMENTED);
+}
+
+int main(void) {
+    test_valid_get_and_trimmed_header();
+    test_post_content_length();
+    test_incomplete_and_bad_request_line();
+    test_unsupported_method_and_version();
+    test_long_target_and_too_many_headers();
+    test_bad_header_and_content_length();
+    test_host_and_transfer_encoding();
+    puts(&quot;all HTTP parser tests passed&quot;);
+    return 0;
+}</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-4"><header class="stage-head"><div class="stage-no">4</div><div><p class="eyebrow">4단계</p><h2>시스템 콜 · 소켓 옵션</h2><p>실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p></div></header><div class="chapters"><article class="chapter" id="4-1">
+<div class="chapter-head"><div><span class="chapter-id">4-1</span><h3>명령줄 인자</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “명령줄 인자”이라는 주제를 다룬다. 구현·확인 목표는 “포트 · 루트 · 대기열 · 일꾼 수를 실행할 때 받기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 포트 · 루트 · 대기열 · 일꾼 수를 실행할 때 받기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>기본값과 명령줄 인자 범위 검사</code><br><span class="muted">확인 위치: <code>src/config.c:37–99행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int config_parse(int argc, char **argv, struct config *cfg) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>포트 · 루트 · 대기열 · 일꾼 수를 실행할 때 받기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>기본값과 명령줄 인자 범위 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/config.c:37–99행</div>
+<pre><code>int config_parse(int argc, char **argv, struct config *cfg) {
+    if (cfg == NULL) {
+        return -1;
+    }
+    *cfg = (struct config){
+        .host = &quot;127.0.0.1&quot;,
+        .port = 8080,
+        .backlog = 128,
+        .root = &quot;./www&quot;,
+        .workers = 8,
+        .timeout_sec = 5,
+        .routes_path = NULL,
+        .forward_proxy = 0
+    };
+
+    opterr = 0;
+    int option;
+    while ((option = getopt(argc, argv, &quot;p:r:b:w:t:c:fh&quot;)) != -1) {
+        switch (option) {
+            case &#x27;p&#x27;:
+                if (parse_number(optarg, 1, 65535, &amp;cfg-&gt;port) &lt; 0) {
+                    fprintf(stderr, &quot;invalid port: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;r&#x27;: cfg-&gt;root = optarg; break;
+            case &#x27;b&#x27;:
+                if (parse_number(optarg, 1, INT_MAX, &amp;cfg-&gt;backlog) &lt; 0) {
+                    fprintf(stderr, &quot;invalid backlog: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;w&#x27;:
+                if (parse_number(optarg, 1, 256, &amp;cfg-&gt;workers) &lt; 0) {
+                    fprintf(stderr, &quot;invalid worker count: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;t&#x27;:
+                if (parse_number(optarg, 1, 3600, &amp;cfg-&gt;timeout_sec) &lt; 0) {
+                    fprintf(stderr, &quot;invalid timeout: %s\n&quot;, optarg);
+                    config_usage(argv[0]);
+                    return -1;
+                }
+                break;
+            case &#x27;c&#x27;: cfg-&gt;routes_path = optarg; break;
+            case &#x27;f&#x27;: cfg-&gt;forward_proxy = 1; break;
+            case &#x27;h&#x27;:
+                config_usage(argv[0]);
+                return 1;
+            default:
+                config_usage(argv[0]);
+                return -1;
+        }
+    }
+    if (optind != argc) {
+        config_usage(argv[0]);
+        return -1;
+    }
+    return 0;</code></pre>
+</details>
+</article><article class="chapter" id="4-2">
+<div class="chapter-head"><div><span class="chapter-id">4-2</span><h3>SIGPIPE와 SO_NOSIGPIPE</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “SIGPIPE와 SO_NOSIGPIPE”이라는 주제를 다룬다. 구현·확인 목표는 “클라이언트가 갑자기 끊어도 서버가 살아 있음”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 클라이언트가 갑자기 끊어도 서버가 살아 있음.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>종료 시그널 처리와 SIGPIPE 방지</code><br><span class="muted">확인 위치: <code>src/main.c:75–94행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">if (sigaction(SIGPIPE, &amp;ignore_pipe, NULL) &lt; 0) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>클라이언트가 갑자기 끊어도 서버가 살아 있음. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>종료 시그널 처리와 SIGPIPE 방지 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:75–94행</div>
+<pre><code>    // 종료 신호를 받으면 accept 반복을 끝내도록 상태만 표시합니다.
+    struct sigaction stop_action = {0};
+    stop_action.sa_handler = request_stop;
+    sigemptyset(&amp;stop_action.sa_mask);
+    if (sigaction(SIGINT, &amp;stop_action, NULL) &lt; 0 ||
+        sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction stop&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }
+
+    // 끊긴 클라이언트에 send해도 SIGPIPE가 서버 프로세스를 끝내지 않게 합니다.
+    struct sigaction ignore_pipe = {0};
+    ignore_pipe.sa_handler = SIG_IGN;
+    sigemptyset(&amp;ignore_pipe.sa_mask);
+    if (sigaction(SIGPIPE, &amp;ignore_pipe, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction SIGPIPE&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }</code></pre>
+</details>
+</article><article class="chapter" id="4-3">
+<div class="chapter-head"><div><span class="chapter-id">4-3</span><h3>시간 제한</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “시간 제한”이라는 주제를 다룬다. 구현·확인 목표는 “말 없는 연결이 제한 시간 뒤 닫힘”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 말 없는 연결이 제한 시간 뒤 닫힘.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>소켓 읽기·쓰기 제한 시간 설정</code><br><span class="muted">확인 위치: <code>src/net.c:91–99행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &amp;timeout, sizeof(timeout)) &lt; 0 ||</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>말 없는 연결이 제한 시간 뒤 닫힘. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>소켓 읽기·쓰기 제한 시간 설정 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:91–99행</div>
+<pre><code>int net_set_timeouts(int fd, int seconds) {
+    struct timeval timeout = {.tv_sec = seconds, .tv_usec = 0};
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &amp;timeout, sizeof(timeout)) &lt; 0 ||
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &amp;timeout, sizeof(timeout)) &lt; 0) {
+        return -1;
+    }
+    return 0;
+}
+</code></pre>
+</details><details class="codebox"><summary>요청 수신 제한 시간과 peer 종료 처리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:115–129행</div>
+<pre><code>                // 커널에 새 요청 바이트를 기존 데이터 뒤에 이어서 rbuf에 복사해 달라고 요청합니다.
+                ssize_t n = recv(c.fd, c.rbuf + c.rlen, available, 0);
+                if (n &lt; 0) {
+                    if (errno == EINTR) break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (c.rlen &gt; 0) {
+                            resp_send_error(c.fd, 408);
+                        }
+                        server_log(&quot;fd %d: request read timed out\n&quot;, c.fd);
+                    } else {
+                        server_log_errno(&quot;recv&quot;, errno);
+                    }
+                    conn_set_state(&amp;c, CONN_CLOSING);
+                } else if (n == 0) {
+                    server_log(&quot;fd %d: peer closed\n&quot;, c.fd);</code></pre>
+</details>
+</article><article class="chapter" id="4-4">
+<div class="chapter-head"><div><span class="chapter-id">4-4</span><h3>EINTR과 안전한 종료</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “EINTR과 안전한 종료”이라는 주제를 다룬다. 구현·확인 목표는 “Ctrl+C로 종료 코드 0”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: Ctrl+C로 종료 코드 0.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>SIGINT·SIGTERM이 종료 표식을 설정</code><br><span class="muted">확인 위치: <code>src/main.c:75–84행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>Ctrl+C로 종료 코드 0. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>SIGINT·SIGTERM이 종료 표식을 설정 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:75–84행</div>
+<pre><code>    // 종료 신호를 받으면 accept 반복을 끝내도록 상태만 표시합니다.
+    struct sigaction stop_action = {0};
+    stop_action.sa_handler = request_stop;
+    sigemptyset(&amp;stop_action.sa_mask);
+    if (sigaction(SIGINT, &amp;stop_action, NULL) &lt; 0 ||
+        sigaction(SIGTERM, &amp;stop_action, NULL) &lt; 0) {
+        server_log_errno(&quot;sigaction stop&quot;, errno);
+        cleanup_routes(routes, cfg.route_count);
+        return 1;
+    }</code></pre>
+</details><details class="codebox"><summary>듣는 소켓·worker pool·라우트 자원 정리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:189–195행</div>
+<pre><code>    }
+
+    close(listen_fd);
+    pool_shutdown(workers);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;</code></pre>
+</details>
+</article><article class="chapter" id="4-5">
+<div class="chapter-head"><div><span class="chapter-id">4-5</span><h3>차단과 비차단, poll()</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “차단과 비차단, poll()”이라는 주제를 다룬다. 구현·확인 목표는 “O_NONBLOCK과 poll() 익히기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 실행 설정, 끊긴 연결, 기다리는 시간, 종료 신호와 소켓 이벤트를 다룹니다. 서버가 실제 실행 환경에서 멈추거나 갑자기 종료되는 일을 제어합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: O_NONBLOCK과 poll() 익히기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>poll()로 소켓 이벤트 기다리기</code><br><span class="muted">확인 위치: <code>src/net.c:112–119행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int result = poll(&amp;pfd, 1, timeout_ms);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>O_NONBLOCK과 poll() 익히기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>poll()로 소켓 이벤트 기다리기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:112–119행</div>
+<pre><code>int net_wait(int fd, short events, int timeout_ms) {
+    struct pollfd pfd = {.fd = fd, .events = events, .revents = 0};
+    int result = poll(&amp;pfd, 1, timeout_ms);
+    if (result &lt;= 0) return result;
+    if (pfd.revents &amp; (events | POLLHUP | POLLERR)) return 1;
+    errno = EBADF;
+    return -1;
+}</code></pre>
+</details><details class="codebox"><summary>listen fd를 감시한 뒤 accept() <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:124–147행</div>
+<pre><code>    // 서버를 계속 실행하며 연결 하나씩 차례대로 받습니다.
+    while (!g_stop) {
+        int ready = net_wait(listen_fd, POLLIN, 1000);
+        if (ready == 0) continue;
+        if (ready &lt; 0) {
+            if (errno == EINTR) continue;
+            server_log_errno(&quot;poll&quot;, errno);
+            continue;
+        }
+
+        // accept()가 접속한 클라이언트의 주소 정보를 기록할 공간입니다.
+        struct sockaddr_in peer;
+        socklen_t peer_len = sizeof(peer);
+
+        // 커널에 listen_fd의 대기 연결 하나를 수락해 새 연결 소켓을 만들도록 요청합니다.
+        int conn_fd = accept(listen_fd, (struct sockaddr *)&amp;peer, &amp;peer_len);
+        if (conn_fd &lt; 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            // 한 연결을 받지 못해도 서버는 종료하지 않고 다음 연결 요청을 기다립니다.
+            server_log_errno(&quot;accept&quot;, errno);
+            continue;
+        }</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-5"><header class="stage-head"><div class="stage-no">5</div><div><p class="eyebrow">5단계</p><h2>응답 조립 · 정적 파일 · CGI</h2><p>요청에 맞는 응답을 만들고 파일이나 CGI 프로그램의 결과를 돌려줍니다. 이 단계에서 서버는 고정 문구를 넘어 실제 웹 자원을 제공합니다.</p></div></header><div class="chapters"><article class="chapter" id="5-1">
+<div class="chapter-head"><div><span class="chapter-id">5-1</span><h3>응답 조립과 오류 응답</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “응답 조립과 오류 응답”이라는 주제를 다룬다. 구현·확인 목표는 “상태 줄 · 표준 헤더 · 오류 쪽”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 요청에 맞는 응답을 만들고 파일이나 CGI 프로그램의 결과를 돌려줍니다. 이 단계에서 서버는 고정 문구를 넘어 실제 웹 자원을 제공합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 상태 줄 · 표준 헤더 · 오류 쪽.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>상태 줄·공통 헤더·오류 본문 조립</code><br><span class="muted">확인 위치: <code>src/response.c:29–74행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">&quot;HTTP/1.1 %d %s\r\n&quot;</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>상태 줄 · 표준 헤더 · 오류 쪽. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>상태 줄·공통 헤더·오류 본문 조립 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/response.c:29–74행</div>
+<pre><code>int resp_send_head(int fd, int status, const char *content_type,
+                   long content_length, int keep_alive) {
+    char date[64] = &quot;Thu, 01 Jan 1970 00:00:00 GMT&quot;;
+    time_t now = time(NULL);
+    struct tm utc;
+    if (now != (time_t)-1 &amp;&amp; gmtime_r(&amp;now, &amp;utc) != NULL) {
+        strftime(date, sizeof(date), &quot;%a, %d %b %Y %H:%M:%S GMT&quot;, &amp;utc);
+    }
+
+    char header[1024];
+    int length = snprintf(header, sizeof(header),
+                          &quot;HTTP/1.1 %d %s\r\n&quot;
+                          &quot;Content-Type: %s\r\n&quot;
+                          &quot;Content-Length: %ld\r\n&quot;
+                          &quot;Connection: %s\r\n&quot;
+                          &quot;Date: %s\r\n&quot;
+                          &quot;Server: c-webserver-proxy/1.0\r\n\r\n&quot;,
+                          status, resp_reason(status),
+                          content_type != NULL ? content_type : &quot;application/octet-stream&quot;,
+                          content_length, keep_alive ? &quot;keep-alive&quot; : &quot;close&quot;, date);
+    if (length &lt; 0 || (size_t)length &gt;= sizeof(header)) {
+        static const char fallback[] =
+            &quot;HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n&quot;;
+        return net_send_all(fd, fallback, sizeof(fallback) - 1);
+    }
+    return net_send_all(fd, header, (size_t)length);
+}
+
+int resp_send_simple(int fd, int status, const char *content_type,
+                     const char *body, size_t len, int keep_alive) {
+    if (len &gt; 0 &amp;&amp; body == NULL) return -1;
+    if (resp_send_head(fd, status, content_type, (long)len, keep_alive) &lt; 0) {
+        return -1;
+    }
+    return len &gt; 0 ? net_send_all(fd, body, len) : 0;
+}
+
+int resp_send_error(int fd, int status) {
+    char body[256];
+    int length = snprintf(body, sizeof(body),
+                          &quot;&lt;!doctype html&gt;&lt;html&gt;&lt;body&gt;&lt;h1&gt;%d %s&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;\n&quot;,
+                          status, resp_reason(status));
+    if (length &lt; 0 || (size_t)length &gt;= sizeof(body)) return -1;
+    return resp_send_simple(fd, status, &quot;text/html; charset=utf-8&quot;,
+                            body, (size_t)length, 0);
+}</code></pre>
+</details>
+</article><article class="chapter" id="5-2">
+<div class="chapter-head"><div><span class="chapter-id">5-2</span><h3>MIME 타입</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “MIME 타입”이라는 주제를 다룬다. 구현·확인 목표는 “확장자를 Content-Type으로”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 요청에 맞는 응답을 만들고 파일이나 CGI 프로그램의 결과를 돌려줍니다. 이 단계에서 서버는 고정 문구를 넘어 실제 웹 자원을 제공합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 확장자를 Content-Type으로.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>파일 확장자를 MIME 형식으로 변환</code><br><span class="muted">확인 위치: <code>src/mime.c:1–38행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">const char *mime_from_path(const char *path) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>확장자를 Content-Type으로. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>파일 확장자를 MIME 형식으로 변환 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/mime.c:1–38행</div>
+<pre><code>#include &quot;mime.h&quot;
+
+#include &lt;string.h&gt;
+#include &lt;strings.h&gt;
+
+const char *mime_from_path(const char *path) {
+    if (path == NULL) return &quot;application/octet-stream&quot;;
+
+    const char *base = strrchr(path, &#x27;/&#x27;);
+    base = base != NULL ? base + 1 : path;
+    const char *dot = strrchr(base, &#x27;.&#x27;);
+    if (dot == NULL || dot == base || dot[1] == &#x27;\0&#x27;) {
+        return &quot;application/octet-stream&quot;;
+    }
+
+    const char *ext = dot + 1;
+    if (strcasecmp(ext, &quot;html&quot;) == 0 || strcasecmp(ext, &quot;htm&quot;) == 0)
+        return &quot;text/html; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;css&quot;) == 0)
+        return &quot;text/css; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;js&quot;) == 0)
+        return &quot;application/javascript; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;json&quot;) == 0)
+        return &quot;application/json; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;txt&quot;) == 0)
+        return &quot;text/plain; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;svg&quot;) == 0)
+        return &quot;image/svg+xml; charset=utf-8&quot;;
+    if (strcasecmp(ext, &quot;png&quot;) == 0)
+        return &quot;image/png&quot;;
+    if (strcasecmp(ext, &quot;jpg&quot;) == 0 || strcasecmp(ext, &quot;jpeg&quot;) == 0)
+        return &quot;image/jpeg&quot;;
+    if (strcasecmp(ext, &quot;gif&quot;) == 0)
+        return &quot;image/gif&quot;;
+    if (strcasecmp(ext, &quot;ico&quot;) == 0)
+        return &quot;image/x-icon&quot;;
+    return &quot;application/octet-stream&quot;;
+}</code></pre>
+</details><details class="codebox"><summary>MIME 결과 단위 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">tests/test_mime.c:1–21행</div>
+<pre><code>#include &quot;mime.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+static void expect(const char *path, const char *type) {
+    assert(strcmp(mime_from_path(path), type) == 0);
+}
+
+int main(void) {
+    expect(&quot;a.HTML&quot;, &quot;text/html; charset=utf-8&quot;);
+    expect(&quot;a.tar.gz&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;noext&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;.hidden&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;dir.d/file&quot;, &quot;application/octet-stream&quot;);
+    expect(&quot;/www/site.css&quot;, &quot;text/css; charset=utf-8&quot;);
+    expect(&quot;image.JPEG&quot;, &quot;image/jpeg&quot;);
+    puts(&quot;all MIME tests passed&quot;);
+    return 0;
+}</code></pre>
+</details>
+</article><article class="chapter" id="5-3">
+<div class="chapter-head"><div><span class="chapter-id">5-3</span><h3>정적 파일</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “정적 파일”이라는 주제를 다룬다. 구현·확인 목표는 “경로 검사 · 404 · 403 · 파일 보내기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 요청에 맞는 응답을 만들고 파일이나 CGI 프로그램의 결과를 돌려줍니다. 이 단계에서 서버는 고정 문구를 넘어 실제 웹 자원을 제공합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 경로 검사 · 404 · 403 · 파일 보내기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>정적 파일 경로 제한·응답 헤더·본문 전송</code><br><span class="muted">확인 위치: <code>src/static.c:66–151행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int file_fd = open(file_path, O_RDONLY);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>경로 검사 · 404 · 403 · 파일 보내기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>정적 파일 경로 제한·응답 헤더·본문 전송 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/static.c:66–151행</div>
+<pre><code>static int path_is_inside(const char *root, const char *file) {
+    size_t root_len = strlen(root);
+    if (strncmp(root, file, root_len) != 0) return 0;
+    return file[root_len] == &#x27;\0&#x27; || file[root_len] == &#x27;/&#x27;;
+}
+
+int static_serve(int fd, const struct config *cfg, const struct http_request *req) {
+    if (strcmp(req-&gt;method, &quot;GET&quot;) != 0) return send_error_result(fd, 405);
+
+    char decoded[PATH_MAX];
+    int decode_result = decode_target(req-&gt;target, decoded, sizeof(decoded));
+    if (decode_result != 0) return send_error_result(fd, decode_result);
+
+    size_t path_len = strlen(decoded);
+    if (path_len &gt; 0 &amp;&amp; decoded[path_len - 1] == &#x27;/&#x27;) {
+        static const char index_name[] = &quot;index.html&quot;;
+        if (path_len + sizeof(index_name) &gt; sizeof(decoded)) {
+            return send_error_result(fd, 414);
+        }
+        memcpy(decoded + path_len, index_name, sizeof(index_name));
+    }
+
+    char root[PATH_MAX];
+    if (realpath(cfg-&gt;root, root) == NULL) {
+        return send_error_result(fd, 500);
+    }
+    char candidate[PATH_MAX];
+    int candidate_len = snprintf(candidate, sizeof(candidate), &quot;%s/%s&quot;,
+                                 root, decoded[0] == &#x27;/&#x27; ? decoded + 1 : decoded);
+    if (candidate_len &lt; 0 || (size_t)candidate_len &gt;= sizeof(candidate)) {
+        return send_error_result(fd, 414);
+    }
+
+    char file_path[PATH_MAX];
+    if (realpath(candidate, file_path) == NULL) {
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        if (errno == EACCES) return send_error_result(fd, 403);
+        return send_error_result(fd, 500);
+    }
+    if (!path_is_inside(root, file_path)) return send_error_result(fd, 403);
+
+    struct stat file_stat;
+    if (stat(file_path, &amp;file_stat) &lt; 0) {
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        if (errno == EACCES) return send_error_result(fd, 403);
+        return send_error_result(fd, 500);
+    }
+    if (!S_ISREG(file_stat.st_mode) || file_stat.st_size &lt; 0 || file_stat.st_size &gt; LONG_MAX) {
+        return send_error_result(fd, 403);
+    }
+
+    int file_fd = open(file_path, O_RDONLY);
+    if (file_fd &lt; 0) {
+        if (errno == EACCES) return send_error_result(fd, 403);
+        if (errno == ENOENT) return send_error_result(fd, 404);
+        return send_error_result(fd, 500);
+    }
+    if (fstat(file_fd, &amp;file_stat) &lt; 0 || !S_ISREG(file_stat.st_mode)) {
+        close(file_fd);
+        return send_error_result(fd, 403);
+    }
+
+    if (resp_send_head(fd, 200, mime_from_path(file_path),
+                       (long)file_stat.st_size, req-&gt;keep_alive) &lt; 0) {
+        close(file_fd);
+        return -1;
+    }
+
+    char buffer[16384];
+    int result = 0;
+    for (;;) {
+        ssize_t n = read(file_fd, buffer, sizeof(buffer));
+        if (n &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (n &lt; 0) {
+            result = -1;
+            break;
+        }
+        if (n == 0) break;
+        if (net_send_all(fd, buffer, (size_t)n) &lt; 0) {
+            result = -1;
+            break;
+        }
+    }
+    close(file_fd);
+    return result;
+}</code></pre>
+</details>
+</article><article class="chapter" id="5-4">
+<div class="chapter-head"><div><span class="chapter-id">5-4</span><h3>CGI</h3></div><span class="badge unverified">코드 상태 미확인 또는 보류</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “CGI”이라는 주제를 다룬다. 구현·확인 목표는 “fork · pipe · dup2 · execve · waitpid”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 요청에 맞는 응답을 만들고 파일이나 CGI 프로그램의 결과를 돌려줍니다. 이 단계에서 서버는 고정 문구를 넘어 실제 웹 자원을 제공합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: fork · pipe · dup2 · execve · waitpid.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>fork() 전에 환경을 만들고 CGI 자식 실행</code><br><span class="muted">확인 위치: <code>src/cgi.c:129–190행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">pid_t pid = fork();</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>fork · pipe · dup2 · execve · waitpid. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>fork() 전에 환경을 만들고 CGI 자식 실행 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/cgi.c:129–190행</div>
+<pre><code>    // fork() 전에 CGI 환경 문자열을 준비합니다.
+    // 여러 스레드에서 호출해도 자식이 fork() 뒤에 snprintf()를 실행하지 않게 합니다.
+    char content_length[32];
+    int content_length_result = snprintf(content_length, sizeof(content_length), &quot;%zu&quot;, body_len);
+    const char *request_content_type = http_header_get(req, &quot;Content-Type&quot;);
+    char env_method[64], env_query[4096], env_length[64], env_type[1200];
+    char env_script[PATH_MAX + 32], env_protocol[32];
+    int env_results[] = {
+        snprintf(env_method, sizeof(env_method), &quot;REQUEST_METHOD=%s&quot;, req-&gt;method),
+        snprintf(env_query, sizeof(env_query), &quot;QUERY_STRING=%s&quot;, query),
+        snprintf(env_length, sizeof(env_length), &quot;CONTENT_LENGTH=%s&quot;, content_length),
+        snprintf(env_type, sizeof(env_type), &quot;CONTENT_TYPE=%s&quot;,
+                 request_content_type != NULL ? request_content_type : &quot;&quot;),
+        snprintf(env_script, sizeof(env_script), &quot;SCRIPT_NAME=%s&quot;, decoded),
+        snprintf(env_protocol, sizeof(env_protocol), &quot;SERVER_PROTOCOL=%s&quot;, req-&gt;version)
+    };
+    size_t env_capacities[] = {
+        sizeof(env_method), sizeof(env_query), sizeof(env_length), sizeof(env_type),
+        sizeof(env_script), sizeof(env_protocol)
+    };
+    if (content_length_result &lt; 0 || (size_t)content_length_result &gt;= sizeof(content_length)) {
+        return cgi_error(fd, 500);
+    }
+    for (size_t i = 0; i &lt; sizeof(env_results) / sizeof(env_results[0]); i++) {
+        if (env_results[i] &lt; 0 || (size_t)env_results[i] &gt;= env_capacities[i]) {
+            return cgi_error(fd, 500);
+        }
+    }
+    char *envp[] = {env_method, env_query, env_length, env_type, env_script,
+                    env_protocol, &quot;GATEWAY_INTERFACE=CGI/1.1&quot;,
+                    &quot;PATH=/usr/bin:/bin&quot;, NULL};
+
+    if (pipe(input_pipe) &lt; 0) return cgi_error(fd, 500);
+    if (pipe(output_pipe) &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+
+    pid_t pid = fork();
+    if (pid &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+    if (pid == 0) {
+        if (dup2(input_pipe[0], STDIN_FILENO) &lt; 0 ||
+            dup2(output_pipe[1], STDOUT_FILENO) &lt; 0) _exit(127);
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+
+        char *argv[] = {script, NULL};
+        execve(script, argv, envp);
+        _exit(127);
+    }
+
+    close(input_pipe[0]);
+    close(output_pipe[1]);
+    if (body_len &gt; 0 &amp;&amp; write_all(input_pipe[1], body, body_len) &lt; 0) {
+        close(input_pipe[1]); close(output_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return cgi_error(fd, 500);</code></pre>
+</details><details class="codebox"><summary>CGI 출력 제한 시간·응답 변환 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/cgi.c:200–266행</div>
+<pre><code>    }
+    size_t output_len = 0;
+    int timed_out = 0;
+    int too_large = 0;
+    for (;;) {
+        int ready = net_wait(output_pipe[0], POLLIN, cfg-&gt;timeout_sec * 1000);
+        if (ready == 0) { timed_out = 1; break; }
+        if (ready &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (ready &lt; 0) break;
+        ssize_t got = read(output_pipe[0], output + output_len,
+                           CGI_OUTPUT_LIMIT - output_len);
+        if (got &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (got &lt; 0) break;
+        if (got == 0) break;
+        output_len += (size_t)got;
+        if (output_len == CGI_OUTPUT_LIMIT) {
+            char extra;
+            ssize_t more = read(output_pipe[0], &amp;extra, 1);
+            if (more &gt; 0) too_large = 1;
+            break;
+        }
+    }
+    close(output_pipe[0]);
+    if (timed_out || too_large) kill(pid, SIGKILL);
+    int child_status = 0;
+    while (waitpid(pid, &amp;child_status, 0) &lt; 0) {
+        if (errno != EINTR) { free(output); return cgi_error(fd, 500); }
+    }
+    if (timed_out) { free(output); return cgi_error(fd, 504); }
+    if (too_large || !WIFEXITED(child_status) || WEXITSTATUS(child_status) != 0) {
+        free(output);
+        return cgi_error(fd, 500);
+    }
+
+    size_t header_end = 0;
+    if (!find_header_end(output, output_len, &amp;header_end)) {
+        free(output);
+        return cgi_error(fd, 500);
+    }
+    char content_type[256] = &quot;text/plain; charset=utf-8&quot;;
+    size_t line = 0;
+    while (line + 1 &lt; header_end) {
+        size_t end = line;
+        while (end + 1 &lt; header_end &amp;&amp;
+               !(output[end] == &#x27;\r&#x27; &amp;&amp; output[end + 1] == &#x27;\n&#x27;)) end++;
+        if (end == line) break;
+        const char *colon = memchr(output + line, &#x27;:&#x27;, end - line);
+        if (colon != NULL) {
+            size_t name_len = (size_t)(colon - (output + line));
+            if (name_len == 12 &amp;&amp; strncasecmp(output + line, &quot;Content-Type&quot;, 12) == 0) {
+                size_t value = (size_t)(colon - output) + 1;
+                while (value &lt; end &amp;&amp; (output[value] == &#x27; &#x27; || output[value] == &#x27;\t&#x27;)) value++;
+                size_t value_len = end - value;
+                if (value_len &gt;= sizeof(content_type)) value_len = sizeof(content_type) - 1;
+                memcpy(content_type, output + value, value_len);
+                content_type[value_len] = &#x27;\0&#x27;;
+            }
+        }
+        line = end + 2;
+    }
+    size_t body_start = header_end;
+    int send_result = resp_send_simple(fd, 200, content_type,
+                                       output + body_start, output_len - body_start,
+                                       req-&gt;keep_alive);
+    free(output);
+    return send_result &lt; 0 ? -1 : 0;
+}</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-6"><header class="stage-head"><div class="stage-no">6</div><div><p class="eyebrow">6단계</p><h2>동시성</h2><p>연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p></div></header><div class="chapters"><article class="chapter" id="6-1">
+<div class="chapter-head"><div><span class="chapter-id">6-1</span><h3>연결마다 스레드 하나</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “연결마다 스레드 하나”이라는 주제를 다룬다. 구현·확인 목표는 “1-6의 한계를 가장 단순하게 풀기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 1-6의 한계를 가장 단순하게 풀기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>연결 스레드가 인자를 꺼내 기존 연결 처리기를 실행</code><br><span class="muted">확인 위치: <code>stage6-per-connection · src/main.c:44–65행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">static void request_stop(int signal_number) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>1-6의 한계를 가장 단순하게 풀기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>연결 스레드가 인자를 꺼내 기존 연결 처리기를 실행 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-per-connection</span></summary>
+<div class="source">stage6-per-connection · src/main.c:44–65행</div>
+<pre><code>
+static void request_stop(int signal_number) {
+    (void)signal_number;
+    g_stop = 1;
+}
+
+int main(int argc, char **argv) {
+    struct config cfg;
+    int config_result = config_parse(argc, argv, &amp;cfg);
+    if (config_result != 0) {
+        return config_result &gt; 0 ? 0 : 2;
+    }
+
+    struct route *routes = NULL;
+    if (cfg.routes_path != NULL) {
+        routes = calloc(ROUTE_MAX, sizeof(*routes));
+        if (routes == NULL) {
+            server_log_errno(&quot;allocate routes&quot;, errno);
+            return 1;
+        }
+        int count = route_load(cfg.routes_path, routes, ROUTE_MAX);
+        if (count &lt; 0) {</code></pre>
+</details><details class="codebox"><summary>accept() 뒤 연결 번호를 힙에 보관하고 스레드를 생성·분리 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-per-connection</span></summary>
+<div class="source">stage6-per-connection · src/main.c:204–247행</div>
+<p class="muted">이 항목은 코드 발췌 대신 검사·측정·설계 기록을 근거로 합니다. 경로의 기록을 확인하세요.</p>
+</details><details class="codebox"><summary>종료 전에 진행 중인 연결 스레드가 끝날 때까지 대기 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-per-connection</span></summary>
+<div class="source">stage6-per-connection · src/main.c:250–274행</div>
+<p class="muted">이 항목은 코드 발췌 대신 검사·측정·설계 기록을 근거로 합니다. 경로의 기록을 확인하세요.</p>
+</details>
+</article><article class="chapter" id="6-2">
+<div class="chapter-head"><div><span class="chapter-id">6-2</span><h3>스레드 풀</h3></div><span class="badge current">현재 학습 위치</span></div>
+<p class="definition"><strong>정의</strong> · 스레드 풀(thread pool)은 미리 만든 여러 실행 일꾼(worker)이 작업 대기열(queue)에서 연결 번호를 꺼내 처리하도록 분배하는 구조다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 뮤텍스와 조건 변수로 만든 고정 크기 대기열.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>일꾼이 대기열에서 fd를 꺼내 연결 처리</code><br><span class="muted">확인 위치: <code>src/pool.c:27–50행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int pool_submit(struct pool *p, int fd) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>뮤텍스와 조건 변수로 만든 고정 크기 대기열. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>일꾼이 대기열에서 fd를 꺼내 연결 처리 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/pool.c:27–50행</div>
+<pre><code>// 일꾼은 큐가 비면 잠들고, 연결 하나를 꺼내 처리한 뒤 다시 기다립니다.
+static void *pool_worker(void *argument) {
+    struct pool *p = argument;
+
+    for (;;) {
+        pthread_mutex_lock(&amp;p-&gt;mutex);
+        while (p-&gt;count == 0 &amp;&amp; !p-&gt;stopping) {
+            pthread_cond_wait(&amp;p-&gt;not_empty, &amp;p-&gt;mutex);
+        }
+
+        if (p-&gt;count == 0 &amp;&amp; p-&gt;stopping) {
+            pthread_mutex_unlock(&amp;p-&gt;mutex);
+            return NULL;
+        }
+
+        int fd = p-&gt;queue[p-&gt;head];
+        p-&gt;head = (p-&gt;head + 1) % p-&gt;queue_cap;
+        p-&gt;count--;
+        pthread_cond_signal(&amp;p-&gt;not_full);
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+
+        p-&gt;handler(fd);
+    }
+}</code></pre>
+</details><details class="codebox"><summary>pool_submit() 원형 대기열 입력 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/pool.c:106–140행</div>
+<pre><code>// 큐가 가득 찬 동안 기다렸다가 연결 fd를 원형 대기열에 넣습니다.
+int pool_submit(struct pool *p, int fd) {
+    if (p == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    int result = pthread_mutex_lock(&amp;p-&gt;mutex);
+    if (result != 0) {
+        errno = result;
+        return -1;
+    }
+
+    while (p-&gt;count == p-&gt;queue_cap &amp;&amp; !p-&gt;stopping) {
+        result = pthread_cond_wait(&amp;p-&gt;not_full, &amp;p-&gt;mutex);
+        if (result != 0) {
+            pthread_mutex_unlock(&amp;p-&gt;mutex);
+            errno = result;
+            return -1;
+        }
+    }
+
+    if (p-&gt;stopping) {
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+        errno = ECANCELED;
+        return -1;
+    }
+
+    p-&gt;queue[p-&gt;tail] = fd;
+    p-&gt;tail = (p-&gt;tail + 1) % p-&gt;queue_cap;
+    p-&gt;count++;
+    pthread_cond_signal(&amp;p-&gt;not_empty);
+    pthread_mutex_unlock(&amp;p-&gt;mutex);
+    return 0;
+}</code></pre>
+</details><details class="codebox"><summary>설정한 수만큼 일꾼을 준비 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:113–116행</div>
+<pre><code>    // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
+    g_worker_config = &amp;cfg;
+    struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
+                                      serve_connection);</code></pre>
+</details>
+</article><article class="chapter" id="6-3">
+<div class="chapter-head"><div><span class="chapter-id">6-3</span><h3>공유 상태와 스레드 안전</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “공유 상태와 스레드 안전”이라는 주제를 다룬다. 구현·확인 목표는 “전역 변수와 스레드에 안전하지 않은 함수 찾기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 전역 변수와 스레드에 안전하지 않은 함수 찾기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>공유 로그를 한 줄씩 잠금 출력</code><br><span class="muted">확인 위치: <code>src/log.c:13–37행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int lock_result = pthread_mutex_lock(&amp;g_log_mutex);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>전역 변수와 스레드에 안전하지 않은 함수 찾기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>공유 로그를 한 줄씩 잠금 출력 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/log.c:13–37행</div>
+<pre><code>// 먼저 한 줄을 만들고, mutex를 잡은 동안 stderr에 끝까지 씁니다.
+void server_log(const char *format, ...) {
+    char line[LOG_LINE_CAP];
+    va_list args;
+    va_start(args, format);
+    int length = vsnprintf(line, sizeof(line), format, args);
+    va_end(args);
+
+    if (length &lt; 0) return;
+    size_t remaining = (size_t)length;
+    if (remaining &gt;= sizeof(line)) remaining = sizeof(line) - 1;
+
+    int lock_result = pthread_mutex_lock(&amp;g_log_mutex);
+    if (lock_result != 0) return;
+
+    size_t written = 0;
+    while (written &lt; remaining) {
+        ssize_t count = write(STDERR_FILENO, line + written, remaining - written);
+        if (count &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (count &lt;= 0) break;
+        written += (size_t)count;
+    }
+
+    pthread_mutex_unlock(&amp;g_log_mutex);
+}</code></pre>
+</details><details class="codebox"><summary>공유 라운드 로빈 번호 보호 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/route.c:198–206행</div>
+<pre><code>// mutex 안에서 번호를 하나 증가시키고 그 번호에 해당하는 백엔드를 돌려줍니다.
+const struct backend *route_pick(struct route *route) {
+    if (route == NULL || route-&gt;nbackends &lt;= 0) return NULL;
+    if (pthread_mutex_lock(&amp;route-&gt;mutex) != 0) return NULL;
+    unsigned index = route-&gt;next % (unsigned)route-&gt;nbackends;
+    route-&gt;next++;
+    pthread_mutex_unlock(&amp;route-&gt;mutex);
+    return &amp;route-&gt;backends[index];
+}</code></pre>
+</details><details class="codebox"><summary>fork() 전에 환경을 준비하고 자식은 execve() <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/cgi.c:129–181행</div>
+<pre><code>    // fork() 전에 CGI 환경 문자열을 준비합니다.
+    // 여러 스레드에서 호출해도 자식이 fork() 뒤에 snprintf()를 실행하지 않게 합니다.
+    char content_length[32];
+    int content_length_result = snprintf(content_length, sizeof(content_length), &quot;%zu&quot;, body_len);
+    const char *request_content_type = http_header_get(req, &quot;Content-Type&quot;);
+    char env_method[64], env_query[4096], env_length[64], env_type[1200];
+    char env_script[PATH_MAX + 32], env_protocol[32];
+    int env_results[] = {
+        snprintf(env_method, sizeof(env_method), &quot;REQUEST_METHOD=%s&quot;, req-&gt;method),
+        snprintf(env_query, sizeof(env_query), &quot;QUERY_STRING=%s&quot;, query),
+        snprintf(env_length, sizeof(env_length), &quot;CONTENT_LENGTH=%s&quot;, content_length),
+        snprintf(env_type, sizeof(env_type), &quot;CONTENT_TYPE=%s&quot;,
+                 request_content_type != NULL ? request_content_type : &quot;&quot;),
+        snprintf(env_script, sizeof(env_script), &quot;SCRIPT_NAME=%s&quot;, decoded),
+        snprintf(env_protocol, sizeof(env_protocol), &quot;SERVER_PROTOCOL=%s&quot;, req-&gt;version)
+    };
+    size_t env_capacities[] = {
+        sizeof(env_method), sizeof(env_query), sizeof(env_length), sizeof(env_type),
+        sizeof(env_script), sizeof(env_protocol)
+    };
+    if (content_length_result &lt; 0 || (size_t)content_length_result &gt;= sizeof(content_length)) {
+        return cgi_error(fd, 500);
+    }
+    for (size_t i = 0; i &lt; sizeof(env_results) / sizeof(env_results[0]); i++) {
+        if (env_results[i] &lt; 0 || (size_t)env_results[i] &gt;= env_capacities[i]) {
+            return cgi_error(fd, 500);
+        }
+    }
+    char *envp[] = {env_method, env_query, env_length, env_type, env_script,
+                    env_protocol, &quot;GATEWAY_INTERFACE=CGI/1.1&quot;,
+                    &quot;PATH=/usr/bin:/bin&quot;, NULL};
+
+    if (pipe(input_pipe) &lt; 0) return cgi_error(fd, 500);
+    if (pipe(output_pipe) &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+
+    pid_t pid = fork();
+    if (pid &lt; 0) {
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+        return cgi_error(fd, 500);
+    }
+    if (pid == 0) {
+        if (dup2(input_pipe[0], STDIN_FILENO) &lt; 0 ||
+            dup2(output_pipe[1], STDOUT_FILENO) &lt; 0) _exit(127);
+        close(input_pipe[0]); close(input_pipe[1]);
+        close(output_pipe[0]); close(output_pipe[1]);
+
+        char *argv[] = {script, NULL};
+        execve(script, argv, envp);
+        _exit(127);</code></pre>
+</details>
+</article><article class="chapter" id="6-4">
+<div class="chapter-head"><div><span class="chapter-id">6-4</span><h3>풀과 함께 안전하게 끝내기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “풀과 함께 안전하게 끝내기”이라는 주제를 다룬다. 구현·확인 목표는 “일꾼을 모두 깨우고 기다린 뒤 정리”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 일꾼을 모두 깨우고 기다린 뒤 정리.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>듣는 소켓을 닫고 풀을 종료</code><br><span class="muted">확인 위치: <code>src/main.c:189–195행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">pool_shutdown(workers);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>일꾼을 모두 깨우고 기다린 뒤 정리. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>듣는 소켓을 닫고 풀을 종료 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/main.c:189–195행</div>
+<pre><code>    }
+
+    close(listen_fd);
+    pool_shutdown(workers);
+    server_log(&quot;server stopped\n&quot;);
+    cleanup_routes(routes, cfg.route_count);
+    return 0;</code></pre>
+</details><details class="codebox"><summary>제출 중단·대기열 drain·join·자원 해제 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/pool.c:142–164행</div>
+<pre><code>// 제출을 막고 대기 중인 일꾼을 깨운 뒤 큐를 비우고 자원을 해제합니다.
+void pool_shutdown(struct pool *p) {
+    if (p == NULL) return;
+
+    if (p-&gt;mutex_ready) {
+        pthread_mutex_lock(&amp;p-&gt;mutex);
+        p-&gt;stopping = 1;
+        if (p-&gt;not_empty_ready) pthread_cond_broadcast(&amp;p-&gt;not_empty);
+        if (p-&gt;not_full_ready) pthread_cond_broadcast(&amp;p-&gt;not_full);
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+    }
+
+    for (int i = 0; i &lt; p-&gt;started_count; i++) {
+        pthread_join(p-&gt;threads[i], NULL);
+    }
+
+    if (p-&gt;not_full_ready) pthread_cond_destroy(&amp;p-&gt;not_full);
+    if (p-&gt;not_empty_ready) pthread_cond_destroy(&amp;p-&gt;not_empty);
+    if (p-&gt;mutex_ready) pthread_mutex_destroy(&amp;p-&gt;mutex);
+    free(p-&gt;queue);
+    free(p-&gt;threads);
+    free(p);
+}</code></pre>
+</details><details class="codebox"><summary>측정한 종료 결과 <span class="kind">검증 결과 — 실제 관찰</span></summary>
+<div class="source">docs/TUTORIAL_LOG.md · 2026-11-25 14:17 KST 기록</div>
+<pre><code>부분 요청 16개를 연결한 뒤 SIGTERM. 서버는 대기 작업을 정리하고 종료 코드 0으로 끝났으며 약 3.8초 걸렸습니다.</code></pre>
+</details>
+</article><article class="chapter" id="6-5">
+<div class="chapter-head"><div><span class="chapter-id">6-5</span><h3>동시성 모델 비교 정리</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “동시성 모델 비교 정리”이라는 주제를 다룬다. 구현·확인 목표는 “프로세스 · 스레드 · I/O 멀티플렉싱 비교와 측정”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 연결을 처리하는 일을 여러 실행 흐름에 나눕니다. 순차 처리의 대기 한계를 줄이고, 공유 자료와 종료 순서를 안전하게 관리합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 프로세스 · 스레드 · I/O 멀티플렉싱 비교와 측정.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>순차 기준: main 스레드가 연결 처리를 마친 뒤 다음 accept()로 이동</code><br><span class="muted">확인 위치: <code>stage6-sequential · src/main.c:173–174행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">serve_connection(conn_fd);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>프로세스 · 스레드 · I/O 멀티플렉싱 비교와 측정. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>순차 기준: main 스레드가 연결 처리를 마친 뒤 다음 accept()로 이동 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-sequential</span></summary>
+<div class="source">stage6-sequential · src/main.c:173–174행</div>
+<pre><code>        // 이 기준 모델은 accept()가 반환한 연결을 현재 main 스레드가 끝까지 처리합니다.
+        serve_connection(conn_fd);</code></pre>
+</details><details class="codebox"><summary>연결별 스레드: 수락한 연결마다 pthread_create()로 실행 단위를 생성 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-per-connection</span></summary>
+<div class="source">stage6-per-connection · src/main.c:213–247행</div>
+<p class="muted">이 항목은 코드 발췌 대신 검사·측정·설계 기록을 근거로 합니다. 경로의 기록을 확인하세요.</p>
+</details><details class="codebox"><summary>스레드 풀: main이 연결 번호를 큐에 넣고 worker가 꺼내 처리 <span class="kind">실제 프로젝트 코드 · 로컬 브랜치 stage6-thread-pool</span></summary>
+<div class="source">stage6-thread-pool · src/main.c:184–188행; src/pool.c:27–49행</div>
+<pre><code>main.c:
+        // 연결 번호를 원형 대기열에 넣고, 일꾼이 연결 처리를 맡게 합니다.
+        if (pool_submit(workers, conn_fd) &lt; 0) {
+            server_log_errno(&quot;pool_submit&quot;, errno);
+            close(conn_fd);
+        }
+
+pool.c:
+// 일꾼은 큐가 비면 잠들고, 연결 하나를 꺼내 처리한 뒤 다시 기다립니다.
+static void *pool_worker(void *argument) {
+    struct pool *p = argument;
+
+    for (;;) {
+        pthread_mutex_lock(&amp;p-&gt;mutex);
+        while (p-&gt;count == 0 &amp;&amp; !p-&gt;stopping) {
+            pthread_cond_wait(&amp;p-&gt;not_empty, &amp;p-&gt;mutex);
+        }
+
+        if (p-&gt;count == 0 &amp;&amp; p-&gt;stopping) {
+            pthread_mutex_unlock(&amp;p-&gt;mutex);
+            return NULL;
+        }
+
+        int fd = p-&gt;queue[p-&gt;head];
+        p-&gt;head = (p-&gt;head + 1) % p-&gt;queue_cap;
+        p-&gt;count--;
+        pthread_cond_signal(&amp;p-&gt;not_full);
+        pthread_mutex_unlock(&amp;p-&gt;mutex);
+
+        p-&gt;handler(fd);
+    }</code></pre>
+</details><details class="codebox"><summary>같은 조건으로 측정한 중앙값과 범위 <span class="kind">실측 결과 · 모델별 4회, 실패 요청 0건</span></summary>
+<div class="source">docs/benchmarks/summary_stage6_models_2026-11-25.md</div>
+<pre><code># 6단계 동시성 모델 비교 요약
+
+동일한 전체 서버 코드에서 연결 분배 방식만 바꾸어 비교했습니다. 서버와 ApacheBench 클라이언트는 같은 Mac에서 실행했습니다. `make clean &amp;&amp; make`의 C11 디버그 빌드(`-g -O0`)를 사용했고, 정적 `/` 파일은 169 bytes였습니다. 각 모델을 `ab -n 2000 -c 50 http://127.0.0.1:18080/`로 네 번 측정했습니다. keep-alive 옵션은 사용하지 않았고, 서버 로그는 세 모델 모두 `/dev/null`로 보냈습니다. 전체 출력은 `stage6_models_2026-11-25.txt`에 있습니다.
+
+| 로컬 브랜치 | 실행별 초당 요청 수 | 중앙값 | 범위 | 실패 요청 |
+|---|---|---:|---:|---:|
+| `stage6-sequential` (`685fdfc`) | 11219.44, 11982.79, 11788.14, 11574.41 | 11681.28 | 11219.44–11982.79 | 0, 0, 0, 0 |
+| `stage6-per-connection` (`1eafd8a`) | 15698.83, 15144.52, 14911.13, 12056.76 | 15027.83 | 12056.76–15698.83 | 0, 0, 0, 0 |
+| `stage6-thread-pool` (`56ef9f8`) | 16521.01, 15507.96, 13467.38, 14487.19 | 14997.58 | 13467.38–16521.01 | 0, 0, 0, 0 |
+
+## 판독
+
+- 순차 브랜치는 `accept()` 다음 `conn_handle()`을 `main` 스레드에서 실행합니다. 한 요청이 끝나기 전에는 그 스레드가 다른 연결을 처리하지 않습니다.
+- 연결별 스레드 브랜치는 수락된 연결마다 heap에 저장한 fd를 새 분리 스레드에 넘깁니다. 완료한 스레드는 종료합니다.
+- 풀 브랜치는 8개 worker와 고정 원형 대기열을 사용합니다.
+- 이 네 번의 Mac 로컬 실행에서는 연결별 스레드와 8-worker 풀의 중앙값이 비슷했습니다. 수치 차이는 이 실험 조건에 한정되며, 모든 시스템에서 한 모델이 더 빠르다는 결론은 내리지 않습니다.
+- 순차 기준은 과거 1단계 커밋 원본이 아닙니다. 현재 전체 기능을 유지한 채 dispatch 방식만 순차로 바꾼 통제 기준입니다. 이 설계 차이를 `docs/TUTORIAL_LOG.md`에도 기록합니다.
+- ApacheBench는 동일 호스트의 loopback 측정입니다. 네트워크 지연, 원격 클라이언트, 동적 요청 부하는 포함되지 않습니다.
+</code></pre>
+</details><details class="codebox"><summary>비교 결과의 해석 범위 <span class="kind">실험 조건 및 제한</span></summary>
+<div class="source">docs/benchmarks/summary_stage6_models_2026-11-25.md · 판독</div>
+<pre><code>순차 11,681.28 req/s · 연결별 스레드 15,027.83 req/s · 8-worker 풀 14,997.58 req/s (중앙값).
+이 Mac의 loopback, -g -O0 빌드, 169-byte 정적 파일, ab -n 2000 -c 50, keep-alive 미사용 조건의 네 번 측정입니다.
+순차 브랜치는 과거 1단계 커밋 원본이 아닙니다. 이 측정만으로 다른 환경의 성능 우위를 단정하지 않습니다.</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-7"><header class="stage-head"><div class="stage-no">7</div><div><p class="eyebrow">7단계</p><h2>프록시</h2><p>서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p></div></header><div class="chapters"><article class="chapter" id="7-1">
+<div class="chapter-head"><div><span class="chapter-id">7-1</span><h3>업스트림에 연결하기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “업스트림에 연결하기”이라는 주제를 다룬다. 구현·확인 목표는 “getaddrinfo와 연결 시간 제한”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: getaddrinfo와 연결 시간 제한.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>net_connect() 제한 시간 연결</code><br><span class="muted">확인 위치: <code>src/net.c:121–223행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">int lookup = getaddrinfo(host, port, &amp;hints, &amp;addresses);</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>getaddrinfo와 연결 시간 제한. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>net_connect() 제한 시간 연결 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/net.c:121–223행</div>
+<pre><code>// 한 업스트림 주소에 비차단 연결을 시도하고 결과를 제한 시간 안에 확인합니다.
+int net_connect(const char *host, const char *port, int timeout_ms) {
+    if (host == NULL || port == NULL || timeout_ms &lt;= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    struct addrinfo hints;
+    memset(&amp;hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    struct addrinfo *addresses = NULL;
+    int lookup = getaddrinfo(host, port, &amp;hints, &amp;addresses);
+    if (lookup != 0) {
+        errno = EHOSTUNREACH;
+        return -1;
+    }
+
+    int saved_error = ECONNREFUSED;
+    int connected_fd = -1;
+    for (struct addrinfo *address = addresses;
+         address != NULL; address = address-&gt;ai_next) {
+        int fd = socket(address-&gt;ai_family, address-&gt;ai_socktype,
+                        address-&gt;ai_protocol);
+        if (fd &lt; 0) {
+            saved_error = errno;
+            continue;
+        }
+        if (net_set_nonblock(fd) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        int result = connect(fd, address-&gt;ai_addr, address-&gt;ai_addrlen);
+        if (result &lt; 0 &amp;&amp; errno != EINPROGRESS &amp;&amp; errno != EWOULDBLOCK &amp;&amp;
+            errno != EALREADY &amp;&amp; errno != EINTR) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        if (result &lt; 0) {
+            int ready;
+            do {
+                ready = net_wait(fd, POLLOUT, timeout_ms);
+            } while (ready &lt; 0 &amp;&amp; errno == EINTR);
+            if (ready == 0) {
+                saved_error = ETIMEDOUT;
+                close(fd);
+                continue;
+            }
+            if (ready &lt; 0) {
+                saved_error = errno;
+                close(fd);
+                continue;
+            }
+
+            int socket_error = 0;
+            socklen_t error_len = sizeof(socket_error);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR,
+                           &amp;socket_error, &amp;error_len) &lt; 0) {
+                saved_error = errno;
+                close(fd);
+                continue;
+            }
+            if (socket_error != 0) {
+                saved_error = socket_error;
+                close(fd);
+                continue;
+            }
+        }
+
+        if (net_set_blocking(fd) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+        struct timeval timeout = {
+            .tv_sec = timeout_ms / 1000,
+            .tv_usec = (timeout_ms % 1000) * 1000
+        };
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,
+                       &amp;timeout, sizeof(timeout)) &lt; 0 ||
+            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO,
+                       &amp;timeout, sizeof(timeout)) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+
+#ifdef SO_NOSIGPIPE
+        int no_sigpipe = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &amp;no_sigpipe, sizeof(no_sigpipe)) &lt; 0) {
+            saved_error = errno;
+            close(fd);
+            continue;
+        }
+#endif</code></pre>
+</details>
+</article><article class="chapter" id="7-2">
+<div class="chapter-head"><div><span class="chapter-id">7-2</span><h3>라우팅 규칙과 라운드 로빈</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “라우팅 규칙과 라운드 로빈”이라는 주제를 다룬다. 구현·확인 목표는 “가장 긴 접두사 고르기, 차례로 돌기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 가장 긴 접두사 고르기, 차례로 돌기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>호스트·가장 긴 경로 접두사 선택과 round-robin</code><br><span class="muted">확인 위치: <code>src/route.c:172–206행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">struct route *route_match(struct route *routes, int count,</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>가장 긴 접두사 고르기, 차례로 돌기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>호스트·가장 긴 경로 접두사 선택과 round-robin <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/route.c:172–206행</div>
+<pre><code>struct route *route_match(struct route *routes, int count,
+                          const char *host, const char *target) {
+    if (routes == NULL || count &lt;= 0 || target == NULL) return NULL;
+
+    struct route *best = NULL;
+    size_t best_prefix = 0;
+    int best_exact_host = 0;
+    for (int i = 0; i &lt; count; i++) {
+        struct route *candidate = &amp;routes[i];
+        size_t prefix_len = strlen(candidate-&gt;prefix);
+        if (!host_matches(candidate-&gt;host, host) ||
+            strncmp(target, candidate-&gt;prefix, prefix_len) != 0) {
+            continue;
+        }
+
+        int exact_host = strcmp(candidate-&gt;host, &quot;*&quot;) != 0;
+        if (best == NULL || prefix_len &gt; best_prefix ||
+            (prefix_len == best_prefix &amp;&amp; exact_host &gt; best_exact_host)) {
+            best = candidate;
+            best_prefix = prefix_len;
+            best_exact_host = exact_host;
+        }
+    }
+    return best;
+}
+
+// mutex 안에서 번호를 하나 증가시키고 그 번호에 해당하는 백엔드를 돌려줍니다.
+const struct backend *route_pick(struct route *route) {
+    if (route == NULL || route-&gt;nbackends &lt;= 0) return NULL;
+    if (pthread_mutex_lock(&amp;route-&gt;mutex) != 0) return NULL;
+    unsigned index = route-&gt;next % (unsigned)route-&gt;nbackends;
+    route-&gt;next++;
+    pthread_mutex_unlock(&amp;route-&gt;mutex);
+    return &amp;route-&gt;backends[index];
+}</code></pre>
+</details><details class="codebox"><summary>라우트 단위 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">tests/test_route.c:1–46행</div>
+<pre><code>#include &quot;route.h&quot;
+
+#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+// 이 테스트가 만든 규칙 파일을 읽고 라우팅 우선순위와 백엔드 순서를 확인합니다.
+int main(void) {
+    const char *path = &quot;build/test_routes.conf&quot;;
+    FILE *file = fopen(path, &quot;w&quot;);
+    assert(file != NULL);
+    fputs(&quot;# wildcard fallback\n&quot;, file);
+    fputs(&quot;* /api/ 127.0.0.1:8001 127.0.0.1:8002\n&quot;, file);
+    fputs(&quot;api.example /api/ 127.0.0.1:8003\n&quot;, file);
+    fputs(&quot;api.example /api/v2/ 127.0.0.1:8004\n&quot;, file);
+    assert(fclose(file) == 0);
+
+    struct route routes[ROUTE_MAX] = {0};
+    int count = route_load(path, routes, ROUTE_MAX);
+    assert(count == 3);
+
+    struct route *route = route_match(routes, count, &quot;api.example:8080&quot;,
+                                      &quot;/api/v2/users&quot;);
+    assert(route == &amp;routes[2]);
+
+    route = route_match(routes, count, &quot;api.example:8080&quot;, &quot;/api/users&quot;);
+    assert(route == &amp;routes[1]);
+
+    route = route_match(routes, count, &quot;other.example:8080&quot;, &quot;/api/users&quot;);
+    assert(route == &amp;routes[0]);
+
+    assert(route_match(routes, count, &quot;other.example&quot;, &quot;/static/index.html&quot;) == NULL);
+
+    const struct backend *backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8001&quot;) == 0);
+    backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8002&quot;) == 0);
+    backend = route_pick(&amp;routes[0]);
+    assert(backend != NULL &amp;&amp; strcmp(backend-&gt;port, &quot;8001&quot;) == 0);
+
+    route_destroy(routes, count);
+    assert(unlink(path) == 0);
+    puts(&quot;all route tests passed&quot;);
+    return 0;
+}</code></pre>
+</details>
+</article><article class="chapter" id="7-3">
+<div class="chapter-head"><div><span class="chapter-id">7-3</span><h3>요청 고쳐 쓰기와 보내기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 프록시는 받은 HTTP 요청에서 홉 사이에만 쓰는 헤더를 정리하고, 업스트림 서버에 맞는 Host 등의 값을 다시 구성한다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 홉 사이 헤더 빼기, Host 바꾸기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>Host·Content-Length·X-Forwarded-For 재작성</code><br><span class="muted">확인 위치: <code>src/proxy.c:107–171행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">strcasecmp(header-&gt;name, &quot;X-Forwarded-For&quot;) == 0 ||</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>홉 사이 헤더 빼기, Host 바꾸기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>Host·Content-Length·X-Forwarded-For 재작성 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/proxy.c:107–171행</div>
+<pre><code>// 목적지 정보를 사용해 안전한 HTTP 요청 헤더를 새로 만듭니다.
+static char *build_request(const struct http_request *req,
+                           const char *request_target,
+                           const char *host_header,
+                           size_t body_len, const char *client_ip,
+                           size_t *header_len) {
+    char *buffer = malloc(PROXY_HEADER_CAP);
+    if (buffer == NULL) return NULL;
+    size_t used = 0;
+
+    if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;%s %s HTTP/1.1\r\n&quot;, req-&gt;method,
+                      request_target) &lt; 0 ||
+        append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;Host: %s\r\n&quot;, host_header) &lt; 0) {
+        free(buffer);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    int had_content_length = 0;
+    for (int i = 0; i &lt; req-&gt;nheaders; i++) {
+        const struct http_header *header = &amp;req-&gt;headers[i];
+        if (!valid_header_name(header-&gt;name) ||
+            !valid_header_value(header-&gt;value)) {
+            free(buffer);
+            errno = EINVAL;
+            return NULL;
+        }
+        if (strcasecmp(header-&gt;name, &quot;Content-Length&quot;) == 0) {
+            had_content_length = 1;
+            continue;
+        }
+        if (strcasecmp(header-&gt;name, &quot;Host&quot;) == 0 ||
+            strcasecmp(header-&gt;name, &quot;X-Forwarded-For&quot;) == 0 ||
+            is_hop_by_hop(req, header-&gt;name)) {
+            continue;
+        }
+        if (append_format(buffer, PROXY_HEADER_CAP, &amp;used, &quot;%s: %s\r\n&quot;,
+                          header-&gt;name, header-&gt;value) &lt; 0) {
+            free(buffer);
+            errno = EOVERFLOW;
+            return NULL;
+        }
+    }
+
+    if (had_content_length || body_len &gt; 0) {
+        if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                          &quot;Content-Length: %zu\r\n&quot;, body_len) &lt; 0) {
+            free(buffer);
+            errno = EOVERFLOW;
+            return NULL;
+        }
+    }
+    if (append_format(buffer, PROXY_HEADER_CAP, &amp;used,
+                      &quot;X-Forwarded-For: %s\r\nConnection: close\r\n\r\n&quot;,
+                      client_ip != NULL ? client_ip : &quot;unknown&quot;) &lt; 0) {
+        free(buffer);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
+    *header_len = used;
+    return buffer;
+}</code></pre>
+</details><details class="codebox"><summary>재작성 요청과 본문을 업스트림에 전송 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/proxy.c:173–200행</div>
+<pre><code>// 연결·요청 전송·응답 중계를 한곳에서 처리하고 만든 소켓을 항상 닫습니다.
+static int proxy_exchange_connected(int client_fd,
+                                    const struct http_request *req,
+                                    const char *body, size_t body_len,
+                                    int upstream_fd, const char *host_header,
+                                    const char *request_target,
+                                    const char *client_ip,
+                                    int timeout_ms) {
+    size_t request_len = 0;
+    char *request = build_request(req, request_target, host_header,
+                                  body_len, client_ip, &amp;request_len);
+    if (request == NULL) {
+        int saved_error = errno;
+        server_log_errno(&quot;build proxy request&quot;, saved_error);
+        close(upstream_fd);
+        return resp_send_error(client_fd, 500) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+
+    if (net_send_all(upstream_fd, request, request_len) &lt; 0 ||
+        (body_len &gt; 0 &amp;&amp; net_send_all(upstream_fd, body, body_len) &lt; 0)) {
+        int saved_error = errno;
+        free(request);
+        close(upstream_fd);
+        server_log(&quot;upstream request send failed (errno=%d)\n&quot;, saved_error);
+        return resp_send_error(client_fd, 502) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+    free(request);
+</code></pre>
+</details>
+</article><article class="chapter" id="7-4">
+<div class="chapter-head"><div><span class="chapter-id">7-4</span><h3>응답 중계와 오류</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “응답 중계와 오류”이라는 주제를 다룬다. 구현·확인 목표는 “흘려보내기, 502 · 504”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 흘려보내기, 502 · 504.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>업스트림 응답을 조각 단위로 전달하고 소켓 닫기</code><br><span class="muted">확인 위치: <code>src/proxy.c:201–260행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">char buffer[PROXY_IO_CAP];</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>흘려보내기, 502 · 504. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>업스트림 응답을 조각 단위로 전달하고 소켓 닫기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/proxy.c:201–260행</div>
+<pre><code>    char buffer[PROXY_IO_CAP];
+    size_t relayed = 0;
+    int result = PROXY_HANDLED;
+    for (;;) {
+        int ready;
+        do {
+            ready = net_wait(upstream_fd, POLLIN, timeout_ms);
+        } while (ready &lt; 0 &amp;&amp; errno == EINTR);
+
+        if (ready == 0) {
+            if (relayed == 0) {
+                result = resp_send_error(client_fd, 504) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (ready &lt; 0) {
+            int saved_error = errno;
+            if (relayed == 0) {
+                server_log(&quot;upstream wait failed (errno=%d)\n&quot;, saved_error);
+                result = resp_send_error(client_fd, 502) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+
+        ssize_t count = recv(upstream_fd, buffer, sizeof(buffer), 0);
+        if (count &lt; 0 &amp;&amp; errno == EINTR) continue;
+        if (count &lt; 0 &amp;&amp; (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            if (relayed == 0) {
+                result = resp_send_error(client_fd, 504) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (count &lt; 0) {
+            int saved_error = errno;
+            if (relayed == 0) {
+                server_log(&quot;upstream receive failed (errno=%d)\n&quot;, saved_error);
+                result = resp_send_error(client_fd, 502) &lt; 0 ?
+                         PROXY_FAILED : PROXY_HANDLED;
+            }
+            break;
+        }
+        if (count == 0) break;
+
+        if (net_send_all(client_fd, buffer, (size_t)count) &lt; 0) {
+            int saved_error = errno;
+            if (saved_error != EPIPE &amp;&amp; saved_error != ECONNRESET) {
+                server_log(&quot;client response send failed (errno=%d)\n&quot;,
+                           saved_error);
+            }
+            result = PROXY_FAILED;
+            break;
+        }
+        relayed += (size_t)count;
+    }
+
+    close(upstream_fd);
+    return result;</code></pre>
+</details><details class="codebox"><summary>연결 실패를 502 또는 504로 바꾸기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/proxy.c:263–280행</div>
+<pre><code>// 업스트림에 연결하고, 연결 실패를 502 또는 504 응답으로 돌려줍니다.
+static int proxy_exchange(int client_fd, const struct http_request *req,
+                          const char *body, size_t body_len,
+                          const struct upstream *upstream,
+                          const char *request_target, const char *client_ip,
+                          int timeout_ms) {
+    int upstream_fd = net_connect(upstream-&gt;host, upstream-&gt;port, timeout_ms);
+    if (upstream_fd &lt; 0) {
+        int saved_error = errno;
+        int status = saved_error == ETIMEDOUT ? 504 : 502;
+        server_log(&quot;upstream connect failed (errno=%d, status=%d)\n&quot;,
+                   saved_error, status);
+        return resp_send_error(client_fd, status) &lt; 0 ? PROXY_FAILED : PROXY_HANDLED;
+    }
+    return proxy_exchange_connected(client_fd, req, body, body_len,
+                                    upstream_fd, upstream-&gt;host_header,
+                                    request_target, client_ip, timeout_ms);
+}</code></pre>
+</details>
+</article><article class="chapter" id="7-5">
+<div class="chapter-head"><div><span class="chapter-id">7-5</span><h3>포워드 프록시</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “포워드 프록시”이라는 주제를 다룬다. 구현·확인 목표는 “절대 URL에서 호스트 뽑기”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 절대 URL에서 호스트 뽑기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>absolute-form 해석과 HTTP 업스트림 전달</code><br><span class="muted">확인 위치: <code>src/proxy.c:323–405행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">static int parse_absolute_target(const char *target, struct upstream *upstream,</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>절대 URL에서 호스트 뽑기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>absolute-form 해석과 HTTP 업스트림 전달 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/proxy.c:323–405행</div>
+<pre><code>// http:// authority와 경로를 나눠 포워드 프록시 목적지를 구성합니다.
+static int parse_absolute_target(const char *target, struct upstream *upstream,
+                                  char *origin, size_t origin_capacity) {
+    if (strncmp(target, &quot;https://&quot;, 8) == 0) return 400;
+    if (strncmp(target, &quot;http://&quot;, 7) != 0) return 400;
+
+    const char *authority = target + 7;
+    const char *path = strpbrk(authority, &quot;/?#&quot;);
+    size_t authority_len = path != NULL ? (size_t)(path - authority) :
+                          strlen(authority);
+    if (authority_len == 0 || authority_len &gt;= sizeof(upstream-&gt;host_header))
+        return 400;
+
+    char authority_copy[272];
+    memcpy(authority_copy, authority, authority_len);
+    authority_copy[authority_len] = &#x27;\0&#x27;;
+    if (strchr(authority_copy, &#x27;@&#x27;) != NULL) return 400;
+
+    const char *host_start = authority_copy;
+    const char *host_end = NULL;
+    const char *port = &quot;80&quot;;
+    if (authority_copy[0] == &#x27;[&#x27;) {
+        host_start++;
+        host_end = strchr(host_start, &#x27;]&#x27;);
+        if (host_end == NULL) return 400;
+        if (host_end[1] == &#x27;:&#x27;) port = host_end + 2;
+        else if (host_end[1] != &#x27;\0&#x27;) return 400;
+    } else {
+        const char *colon = strchr(authority_copy, &#x27;:&#x27;);
+        host_end = colon != NULL ? colon : authority_copy + authority_len;
+        if (colon != NULL) port = colon + 1;
+    }
+    size_t host_len = (size_t)(host_end - host_start);
+    if (host_len == 0 || host_len &gt;= sizeof(upstream-&gt;host) ||
+        strlen(port) &gt;= sizeof(upstream-&gt;port)) return 400;
+    for (const char *p = port; *p; p++) {
+        if (!isdigit((unsigned char)*p)) return 400;
+    }
+    char *port_end = NULL;
+    errno = 0;
+    long port_number = strtol(port, &amp;port_end, 10);
+    if (errno == ERANGE || port_end == port || *port_end != &#x27;\0&#x27; ||
+        port_number &lt; 1 || port_number &gt; 65535) return 400;
+
+    memcpy(upstream-&gt;host, host_start, host_len);
+    upstream-&gt;host[host_len] = &#x27;\0&#x27;;
+    memcpy(upstream-&gt;port, port, strlen(port) + 1);
+    memcpy(upstream-&gt;host_header, authority_copy, authority_len + 1);
+
+    if (path == NULL || *path == &#x27;#&#x27;) {
+        if (origin_capacity &lt; 2) return 400;
+        memcpy(origin, &quot;/&quot;, 2);
+    } else if (*path == &#x27;?&#x27;) {
+        int n = snprintf(origin, origin_capacity, &quot;/%s&quot;, path);
+        if (n &lt; 0 || (size_t)n &gt;= origin_capacity) return 414;
+    } else if (*path == &#x27;#&#x27;) {
+        if (origin_capacity &lt; 2) return 414;
+        memcpy(origin, &quot;/&quot;, 2);
+    } else {
+        const char *fragment = strchr(path, &#x27;#&#x27;);
+        size_t path_len = fragment != NULL ? (size_t)(fragment - path) : strlen(path);
+        if (path_len == 0 || path_len &gt;= origin_capacity) return 414;
+        memcpy(origin, path, path_len);
+        origin[path_len] = &#x27;\0&#x27;;
+    }
+    return 0;
+}
+
+// -f 모드에서 absolute-form 요청을 origin-form으로 바꾸어 전달합니다.
+int proxy_forward(int client_fd, const struct http_request *req,
+                  const char *body, size_t body_len, int timeout_sec,
+                  const char *client_ip) {
+    struct upstream upstream;
+    memset(&amp;upstream, 0, sizeof(upstream));
+    char origin[2048];
+    int parse_result = parse_absolute_target(req-&gt;target, &amp;upstream,
+                                             origin, sizeof(origin));
+    if (parse_result != 0) {
+        return resp_send_error(client_fd, parse_result) &lt; 0 ?
+               PROXY_FAILED : PROXY_HANDLED;
+    }
+    return proxy_exchange(client_fd, req, body, body_len, &amp;upstream, origin,
+                          client_ip, timeout_sec * 1000);</code></pre>
+</details><details class="codebox"><summary>-f 조건에 따른 포워드 프록시 분기 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">src/conn.c:243–265행</div>
+<pre><code>                if (cfg-&gt;forward_proxy &amp;&amp;
+                    (strncmp(req.target, &quot;http://&quot;, 7) == 0 ||
+                     strncmp(req.target, &quot;https://&quot;, 8) == 0)) {
+                    serve_result = proxy_forward(c.fd, &amp;req, c.body,
+                                                 c.body_len, cfg-&gt;timeout_sec,
+                                                 client_ip);
+                    proxy_handled = 1;
+                } else {
+                    int reverse_result = proxy_reverse(c.fd, &amp;req, c.body,
+                                                       c.body_len, cfg,
+                                                       client_ip);
+                    if (reverse_result == PROXY_NO_ROUTE) {
+                        if (strncmp(req.target, &quot;/cgi-bin/&quot;, 9) == 0) {
+                            serve_result = cgi_serve(c.fd, cfg, &amp;req,
+                                                     c.body, c.body_len);
+                        } else {
+                            serve_result = static_serve(c.fd, cfg, &amp;req);
+                        }
+                    } else {
+                        serve_result = reverse_result == PROXY_FAILED ? -1 : 0;
+                        proxy_handled = 1;
+                    }
+                }</code></pre>
+</details>
+</article><article class="chapter" id="7-6">
+<div class="chapter-head"><div><span class="chapter-id">7-6</span><h3>캐시 (선택)</h3></div><span class="badge todo">선택 구간</span></div>
+<p class="definition"><strong>정의</strong> · 캐시를 선택한 경우에만 다루는 설계 예시다. 캐시에서 찾으면 저장된 응답을 보내고, 찾지 못하면 업스트림에서 받은 뒤 저장 가능 여부를 확인한다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 서버가 다른 서버에 요청을 전달하고 응답을 되돌려 줍니다. 라우팅과 요청 수정으로 리버스·포워드 프록시 기능을 조립합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 사용자가 하겠다고 할 때만.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>캐시 hit/miss 흐름</code><br><span class="muted">확인 위치: <code>7-6 · 사용자가 선택한 경우에만 진행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">if (cache_lookup(key, &amp;response)) {</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>사용자가 하겠다고 할 때만. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>캐시 hit/miss 흐름 <span class="kind">설계 예시 · 구현 전</span></summary>
+<div class="source">7-6 · 사용자가 선택한 경우에만 진행</div>
+<pre><code>if (cache_lookup(key, &amp;response)) {
+    send_cached_response(client_fd, &amp;response);
+} else {
+    fetch_from_upstream(&amp;response);
+    if (response_is_cacheable(&amp;response)) {
+        cache_store(key, &amp;response);
+    }
+    send_response(client_fd, &amp;response);
+}</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-8"><header class="stage-head"><div class="stage-no">8</div><div><p class="eyebrow">8단계</p><h2>검증</h2><p>단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p></div></header><div class="chapters"><article class="chapter" id="8-1">
+<div class="chapter-head"><div><span class="chapter-id">8-1</span><h3>단위 테스트 정리</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “단위 테스트 정리”이라는 주제를 다룬다. 구현·확인 목표는 “파서 · MIME · 라우팅”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 파서 · MIME · 라우팅.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>세 단위 검사와 sanitizer 단위 검사 target</code><br><span class="muted">확인 위치: <code>Makefile:39–55행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">$(TEST_HTTP_BIN): $(TEST_HTTP_SRC) include/http.h | build</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>파서 · MIME · 라우팅. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>세 단위 검사와 sanitizer 단위 검사 target <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">Makefile:39–55행</div>
+<pre><code>$(TEST_HTTP_BIN): $(TEST_HTTP_SRC) include/http.h | build
+	$(CC) $(CFLAGS) $(TEST_HTTP_SRC) $(LDFLAGS) -o $@
+
+$(TEST_MIME_BIN): $(TEST_MIME_SRC) include/mime.h | build
+	$(CC) $(CFLAGS) $(TEST_MIME_SRC) $(LDFLAGS) -o $@
+
+$(TEST_ROUTE_BIN): $(TEST_ROUTE_SRC) include/route.h | build
+	$(CC) $(CFLAGS) $(TEST_ROUTE_SRC) $(LDFLAGS) -o $@
+
+test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN)
+	./$(TEST_HTTP_BIN)
+	./$(TEST_MIME_BIN)
+	./$(TEST_ROUTE_BIN)
+
+test-asan: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+test-asan: LDFLAGS += -fsanitize=address,undefined
+test-asan: clean test</code></pre>
+</details><details class="codebox"><summary>실행 결과 <span class="kind">실제 검사 출력 요약</span></summary>
+<div class="source">docs/TUTORIAL_LOG.md · 2026-11-25 14:58 KST</div>
+<pre><code>all HTTP parser tests passed
+all MIME tests passed
+all route tests passed</code></pre>
+</details>
+</article><article class="chapter" id="8-2">
+<div class="chapter-head"><div><span class="chapter-id">8-2</span><h3>기능 테스트</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “기능 테스트”이라는 주제를 다룬다. 구현·확인 목표는 “curl 시나리오와 동시 클라이언트”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: curl 시나리오와 동시 클라이언트.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>정적 파일·오류 요청·크기 제한 검사</code><br><span class="muted">확인 위치: <code>scripts/functional_test.sh:89–120행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">if curl -sS --max-time 1 &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt;/dev/null 2&gt;&amp;1; then</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>curl 시나리오와 동시 클라이언트. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>정적 파일·오류 요청·크기 제한 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:89–120행</div>
+<pre><code>    if ! kill -0 &quot;$server_pid&quot; 2&gt;/dev/null; then break; fi
+    if curl -sS --max-time 1 &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt;/dev/null 2&gt;&amp;1; then
+        ready=1
+        break
+    fi
+    sleep 0.1
+done
+if [[ &quot;$ready&quot; -ne 1 ]]; then
+    printf &#x27;서버가 시작되지 않았습니다. 로그: %s\n&#x27; &quot;$SERVER_LOG&quot; &gt;&amp;2
+    exit 2
+fi
+
+fd_before=&quot;&quot;
+if command -v lsof &gt;/dev/null 2&gt;&amp;1; then
+    fd_before=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+fi
+zombies_before=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+
+status_for() {
+    curl -sS --max-time 5 -o &quot;$BUILD_DIR/functional_body.tmp&quot; \
+        -w &#x27;%{http_code}&#x27; &quot;$@&quot; 2&gt;/dev/null || true
+}
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;정적 파일 서빙 시험 페이지&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;정적 파일 HTTP 200&#x27;
+else fail &quot;정적 파일 HTTP 200 (status=$status)&quot;; fi
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/missing-file&quot;)
+[[ &quot;$status&quot; == 404 ]] &amp;&amp; pass &#x27;없는 파일 HTTP 404&#x27; || fail &quot;없는 파일 HTTP 404 (status=$status)&quot;
+
+status=$(status_for --path-as-is &quot;http://127.0.0.1:$SERVER_PORT/../Makefile&quot;)</code></pre>
+</details><details class="codebox"><summary>keep-alive·리버스·포워드 프록시 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:147–177행</div>
+<pre><code>curl -sS --http1.1 -v &quot;http://127.0.0.1:$SERVER_PORT/&quot; \
+    &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt; /dev/null 2&gt; &quot;$BUILD_DIR/keepalive.log&quot;
+if grep -q &#x27;Re-using existing connection&#x27; &quot;$BUILD_DIR/keepalive.log&quot;; then
+    pass &#x27;연결 유지로 요청 두 건&#x27;
+else fail &#x27;연결 유지로 요청 두 건&#x27;; fi
+
+proxy_a=$(curl -sS --max-time 5 &quot;http://127.0.0.1:$SERVER_PORT/api/&quot;)
+proxy_b=$(curl -sS --max-time 5 &quot;http://127.0.0.1:$SERVER_PORT/api/&quot;)
+if [[ &quot;$proxy_a&quot; == &#x27;backend A&#x27; &amp;&amp; &quot;$proxy_b&quot; == &#x27;backend B&#x27; ]]; then
+    pass &#x27;리버스 프록시 라운드 로빈&#x27;
+else fail &quot;리버스 프록시 라운드 로빈 (A=&#x27;$proxy_a&#x27;, B=&#x27;$proxy_b&#x27;)&quot;; fi
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/dead/&quot;)
+[[ &quot;$status&quot; == 502 ]] &amp;&amp; pass &#x27;꺼진 백엔드 HTTP 502&#x27; || fail &quot;꺼진 백엔드 HTTP 502 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/timeout/&quot;)
+[[ &quot;$status&quot; == 504 ]] &amp;&amp; pass &#x27;응답 없는 백엔드 HTTP 504&#x27; || fail &quot;응답 없는 백엔드 HTTP 504 (status=$status)&quot;
+
+connect_output=$(curl -k -v --max-time 3 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; https://example.com/ 2&gt;&amp;1 || true)
+if grep -q &#x27;response 501&#x27; &lt;&lt;&lt; &quot;$connect_output&quot;; then
+    pass &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;
+else fail &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;; fi
+
+https_status=$(printf &#x27;GET https://example.com/ HTTP/1.1\r\nHost: example.com\r\n\r\n&#x27; | \
+    nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$https_status&quot; == 400 ]] &amp;&amp; pass &#x27;https absolute-form 거부 HTTP 400&#x27; || fail &quot;https absolute-form 거부 HTTP 400 (status=${https_status:-없음})&quot;
+
+forward=$(curl -sS --max-time 5 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; &quot;http://127.0.0.1:$BACKEND_A_PORT/&quot;)
+[[ &quot;$forward&quot; == &#x27;backend A&#x27; ]] &amp;&amp; pass &#x27;포워드 프록시&#x27; || fail &quot;포워드 프록시 (body=&#x27;$forward&#x27;)&quot;</code></pre>
+</details><details class="codebox"><summary>20개 동시 요청·중도 종료·fd/좀비 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:179–217행</div>
+<pre><code>concurrent_pids=()
+for i in $(seq 1 20); do
+    (curl -sS --max-time 5 -o /dev/null -w &#x27;%{http_code}&#x27; \
+        &quot;http://127.0.0.1:$SERVER_PORT/&quot; &gt; &quot;$BUILD_DIR/concurrent.$i&quot;) &amp;
+    concurrent_pids+=(&quot;$!&quot;)
+done
+concurrent_failed=0
+for pid in &quot;${concurrent_pids[@]}&quot;; do
+    wait &quot;$pid&quot; || concurrent_failed=1
+done
+for i in $(seq 1 20); do
+    [[ &quot;$(cat &quot;$BUILD_DIR/concurrent.$i&quot; 2&gt;/dev/null)&quot; == 200 ]] || concurrent_failed=1
+    rm -f &quot;$BUILD_DIR/concurrent.$i&quot;
+done
+if [[ &quot;$concurrent_failed&quot; -eq 0 ]]; then
+    pass &#x27;동시 클라이언트 20개&#x27;
+else fail &#x27;동시 클라이언트 20개&#x27;; fi
+
+# 느린 수신자가 큰 파일 전송 도중 연결을 닫아도 서버가 살아 있는지 봅니다.
+curl -sS --limit-rate 16k --max-time 0.2 \
+    &quot;http://127.0.0.1:$SERVER_PORT/large-test.bin&quot; -o /dev/null \
+    2&gt; &quot;$BUILD_DIR/client_abort.log&quot; || true
+sleep 0.2
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+[[ &quot;$status&quot; == 200 ]] &amp;&amp; pass &#x27;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존&#x27; || \
+    fail &quot;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+[[ &quot;$status&quot; == 200 ]] &amp;&amp; pass &#x27;극한 요청 뒤 서버 생존&#x27; || fail &quot;극한 요청 뒤 서버 생존 (status=$status)&quot;
+
+if [[ -n &quot;$fd_before&quot; ]]; then
+    fd_after=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+    [[ &quot;$fd_after&quot; == &quot;$fd_before&quot; ]] &amp;&amp; pass &#x27;요청 전후 파일 디스크립터 수 동일&#x27; || fail &quot;파일 디스크립터 수 (before=$fd_before after=$fd_after)&quot;
+else
+    printf &#x27;SKIP lsof 파일 디스크립터 확인 (lsof 없음)\n&#x27;
+fi
+
+zombies_after=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+[[ &quot;$zombies_after&quot; == &quot;$zombies_before&quot; ]] &amp;&amp; pass &#x27;좀비 프로세스 수 증가 없음&#x27; || fail &quot;좀비 프로세스 수 (before=$zombies_before after=$zombies_after)&quot;</code></pre>
+</details>
+</article><article class="chapter" id="8-3">
+<div class="chapter-head"><div><span class="chapter-id">8-3</span><h3>부하 테스트</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “부하 테스트”이라는 주제를 다룬다. 구현·확인 목표는 “ab로 재고 잰 값만 기록”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: ab로 재고 잰 값만 기록.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>ApacheBench 세 번 측정 요약</code><br><span class="muted">확인 위치: <code>docs/benchmarks/summary_2026-11-25.md:1–12행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">ApacheBench 2.3, HTTP 정적 `/` 응답 169 bytes, 서버와 클라이언트 모두 같은 Mac, C11 기본 디버그 빌드(`-g -O0`), 요청 10,000개, 동시성 100. 각 조건을 세 번 실행했습니다.</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>ab로 재고 잰 값만 기록. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>ApacheBench 세 번 측정 요약 <span class="kind">실측 결과 · 요약 파일</span></summary>
+<div class="source">docs/benchmarks/summary_2026-11-25.md:1–12행</div>
+<pre><code># 2026-11-25 부하 검사 요약
+
+ApacheBench 2.3, HTTP 정적 `/` 응답 169 bytes, 서버와 클라이언트 모두 같은 Mac, C11 기본 디버그 빌드(`-g -O0`), 요청 10,000개, 동시성 100. 각 조건을 세 번 실행했습니다.
+
+| 일꾼 수 | 연결 조건 | 초당 요청 수 (1 / 2 / 3) | 실패 요청 (1 / 2 / 3) | 요청당 시간 (1 / 2 / 3) |
+|---:|---|---|---|---|
+| 8 | keep-alive 없음 | 10166.16 / 9556.20 / 10283.50 | 0 / 0 / 0 | 9.837 / 10.464 / 9.724 ms |
+| 8 | keep-alive | 325.80 / 325.71 / 325.89 | 48 / 48 / 47 (Length) | 306.935 / 307.017 / 306.856 ms |
+| 128 | keep-alive 없음 | 9257.13 / 9384.72 / 7153.99 | 0 / 0 / 0 | 10.802 / 10.656 / 13.978 ms |
+| 128 | keep-alive | 14854.51 / 15430.55 / 15031.22 | 0 / 0 / 0 | 6.732 / 6.481 / 6.653 ms |
+
+worker 8의 keep-alive 결과는 세 번 모두 응답 길이 검사 실패를 포함했습니다. worker 128의 같은 keep-alive 부하에서는 세 번 모두 실패가 없었습니다. 이는 로컬 측정값이며 일반 성능 보장이 아닙니다. 모든 원문은 [`apachebench_2026-11-25.txt`](apachebench_2026-11-25.txt)에 있습니다.</code></pre>
+</details><details class="codebox"><summary>측정 도구와 고정 조건 <span class="kind">실측 조건</span></summary>
+<div class="source">docs/benchmarks/apachebench_2026-11-25.txt:1–5행</div>
+<pre><code>Date: 2026-11-25 KST
+Build: make (C11, -Wall -Wextra -Wpedantic -g -O0 -pthread)
+Server: ./build/server -p 8080 -w 8 -t 5
+Target: http://127.0.0.1:8080/
+Each mode: ApacheBench 2.3, -n 10000 -c 100, three runs.</code></pre>
+</details>
+</article><article class="chapter" id="8-4">
+<div class="chapter-head"><div><span class="chapter-id">8-4</span><h3>메모리와 자원 검사</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “메모리와 자원 검사”이라는 주제를 다룬다. 구현·확인 목표는 “ASan · leaks · 번호 누수 · 좀비”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: ASan · leaks · 번호 누수 · 좀비.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>ASan·UBSan 및 sanitizer 단위 검사 target</code><br><span class="muted">확인 위치: <code>Makefile:31–55행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">asan: CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>ASan · leaks · 번호 누수 · 좀비. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>ASan·UBSan 및 sanitizer 단위 검사 target <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">Makefile:31–55행</div>
+<pre><code>asan: CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer
+asan: LDFLAGS += -fsanitize=address,undefined
+asan: clean all
+
+tsan: CFLAGS += -fsanitize=thread -fno-omit-frame-pointer
+tsan: LDFLAGS += -fsanitize=thread
+tsan: clean all
+
+$(TEST_HTTP_BIN): $(TEST_HTTP_SRC) include/http.h | build
+	$(CC) $(CFLAGS) $(TEST_HTTP_SRC) $(LDFLAGS) -o $@
+
+$(TEST_MIME_BIN): $(TEST_MIME_SRC) include/mime.h | build
+	$(CC) $(CFLAGS) $(TEST_MIME_SRC) $(LDFLAGS) -o $@
+
+$(TEST_ROUTE_BIN): $(TEST_ROUTE_SRC) include/route.h | build
+	$(CC) $(CFLAGS) $(TEST_ROUTE_SRC) $(LDFLAGS) -o $@
+
+test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN)
+	./$(TEST_HTTP_BIN)
+	./$(TEST_MIME_BIN)
+	./$(TEST_ROUTE_BIN)
+
+test-asan: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+test-asan: LDFLAGS += -fsanitize=address,undefined
+test-asan: clean test</code></pre>
+</details><details class="codebox"><summary>leaks 실행·관찰 결과 <span class="kind">실제 검사 결과</span></summary>
+<div class="source">docs/benchmarks/leaks_2026-11-25.txt:1–9행</div>
+<pre><code>Command: leaks --atExit -- ./build/server -p 18080 -w 4 -t 1
+The server handled two local HTTP requests and received SIGTERM.
+leaks exit status: 0
+
+Process 28065 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+leaks Report Version: 4.0, multi-line stacks
+Process 28065: 216 nodes malloced for 55 KB
+Process 28065: 0 leaks for 0 total leaked bytes.</code></pre>
+</details><details class="codebox"><summary>요청 전후 fd·좀비 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:209–217행</div>
+<pre><code>if [[ -n &quot;$fd_before&quot; ]]; then
+    fd_after=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+    [[ &quot;$fd_after&quot; == &quot;$fd_before&quot; ]] &amp;&amp; pass &#x27;요청 전후 파일 디스크립터 수 동일&#x27; || fail &quot;파일 디스크립터 수 (before=$fd_before after=$fd_after)&quot;
+else
+    printf &#x27;SKIP lsof 파일 디스크립터 확인 (lsof 없음)\n&#x27;
+fi
+
+zombies_after=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+[[ &quot;$zombies_after&quot; == &quot;$zombies_before&quot; ]] &amp;&amp; pass &#x27;좀비 프로세스 수 증가 없음&#x27; || fail &quot;좀비 프로세스 수 (before=$zombies_before after=$zombies_after)&quot;</code></pre>
+</details>
+</article><article class="chapter" id="8-5">
+<div class="chapter-head"><div><span class="chapter-id">8-5</span><h3>네 가지 극한 경우</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “네 가지 극한 경우”이라는 주제를 다룬다. 구현·확인 목표는 “잘못된 요청 · 큰 본문 · 백엔드 무응답 · 갑작스러운 끊김”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 단위·통합·부하·자원 검사를 통해 기능과 한계를 확인합니다. 테스트는 모듈 사이 연결이 기대대로 작동하는지 보여 줍니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 잘못된 요청 · 큰 본문 · 백엔드 무응답 · 갑작스러운 끊김.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>잘못된 요청·지원하지 않는 메서드·큰 입력 검사</code><br><span class="muted">확인 위치: <code>scripts/functional_test.sh:95–145행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">curl -sS --max-time 5 -o &quot;$BUILD_DIR/functional_body.tmp&quot; \</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>잘못된 요청 · 큰 본문 · 백엔드 무응답 · 갑작스러운 끊김. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>잘못된 요청·지원하지 않는 메서드·큰 입력 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:95–145행</div>
+<pre><code>done
+if [[ &quot;$ready&quot; -ne 1 ]]; then
+    printf &#x27;서버가 시작되지 않았습니다. 로그: %s\n&#x27; &quot;$SERVER_LOG&quot; &gt;&amp;2
+    exit 2
+fi
+
+fd_before=&quot;&quot;
+if command -v lsof &gt;/dev/null 2&gt;&amp;1; then
+    fd_before=$(lsof -nP -a -p &quot;$server_pid&quot; 2&gt;/dev/null | awk &#x27;NR &gt; 1 { n++ } END { print n + 0 }&#x27;)
+fi
+zombies_before=$(ps -axo stat= 2&gt;/dev/null | awk &#x27;$1 ~ /Z/ { n++ } END { print n + 0 }&#x27;)
+
+status_for() {
+    curl -sS --max-time 5 -o &quot;$BUILD_DIR/functional_body.tmp&quot; \
+        -w &#x27;%{http_code}&#x27; &quot;$@&quot; 2&gt;/dev/null || true
+}
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;정적 파일 서빙 시험 페이지&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;정적 파일 HTTP 200&#x27;
+else fail &quot;정적 파일 HTTP 200 (status=$status)&quot;; fi
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/missing-file&quot;)
+[[ &quot;$status&quot; == 404 ]] &amp;&amp; pass &#x27;없는 파일 HTTP 404&#x27; || fail &quot;없는 파일 HTTP 404 (status=$status)&quot;
+
+status=$(status_for --path-as-is &quot;http://127.0.0.1:$SERVER_PORT/../Makefile&quot;)
+[[ &quot;$status&quot; == 403 ]] &amp;&amp; pass &#x27;루트 밖 경로 HTTP 403&#x27; || fail &quot;루트 밖 경로 HTTP 403 (status=$status)&quot;
+
+bad_status=$(printf &#x27;GARBAGE\r\n\r\n&#x27; | nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$bad_status&quot; == 400 ]] &amp;&amp; pass &#x27;잘못된 요청 HTTP 400&#x27; || fail &quot;잘못된 요청 HTTP 400 (status=${bad_status:-없음})&quot;
+
+method_status=$(printf &#x27;PUT / HTTP/1.1\r\nHost: localhost\r\n\r\n&#x27; | nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$method_status&quot; == 501 ]] &amp;&amp; pass &#x27;지원하지 않는 메서드 HTTP 501&#x27; || fail &quot;지원하지 않는 메서드 HTTP 501 (status=${method_status:-없음})&quot;
+
+long_path=$(python3 -c &#x27;print(&quot;a&quot; * 3000)&#x27;)
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/$long_path&quot;)
+[[ &quot;$status&quot; == 414 ]] &amp;&amp; pass &#x27;긴 요청 대상 HTTP 414&#x27; || fail &quot;긴 요청 대상 HTTP 414 (status=$status)&quot;
+
+status=$(head -c 2000000 /dev/zero | curl -sS --max-time 5 -o /dev/null \
+    -w &#x27;%{http_code}&#x27; --data-binary @- &quot;http://127.0.0.1:$SERVER_PORT/echo&quot; 2&gt;/dev/null || true)
+[[ &quot;$status&quot; == 413 ]] &amp;&amp; pass &#x27;큰 본문 HTTP 413&#x27; || fail &quot;큰 본문 HTTP 413 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/cgi-bin/hello.sh?name=test&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;hello query=name=test&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;CGI GET&#x27;
+else fail &quot;CGI GET (status=$status)&quot;; fi
+
+status=$(status_for -d &#x27;a=1&amp;b=2&#x27; &quot;http://127.0.0.1:$SERVER_PORT/cgi-bin/echo.sh&quot;)
+if [[ &quot;$status&quot; == 200 ]] &amp;&amp; grep -q &#x27;a=1&amp;b=2&#x27; &quot;$BUILD_DIR/functional_body.tmp&quot;; then
+    pass &#x27;CGI POST&#x27;
+else fail &quot;CGI POST (status=$status)&quot;; fi</code></pre>
+</details><details class="codebox"><summary>연결 실패·무응답 백엔드·CONNECT·포워드 프록시 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:159–177행</div>
+<pre><code>status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/dead/&quot;)
+[[ &quot;$status&quot; == 502 ]] &amp;&amp; pass &#x27;꺼진 백엔드 HTTP 502&#x27; || fail &quot;꺼진 백엔드 HTTP 502 (status=$status)&quot;
+
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/timeout/&quot;)
+[[ &quot;$status&quot; == 504 ]] &amp;&amp; pass &#x27;응답 없는 백엔드 HTTP 504&#x27; || fail &quot;응답 없는 백엔드 HTTP 504 (status=$status)&quot;
+
+connect_output=$(curl -k -v --max-time 3 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; https://example.com/ 2&gt;&amp;1 || true)
+if grep -q &#x27;response 501&#x27; &lt;&lt;&lt; &quot;$connect_output&quot;; then
+    pass &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;
+else fail &#x27;HTTPS CONNECT 거부 HTTP 501&#x27;; fi
+
+https_status=$(printf &#x27;GET https://example.com/ HTTP/1.1\r\nHost: example.com\r\n\r\n&#x27; | \
+    nc -w 2 127.0.0.1 &quot;$SERVER_PORT&quot; 2&gt;/dev/null | head -n 1 | awk &#x27;{print $2}&#x27;)
+[[ &quot;$https_status&quot; == 400 ]] &amp;&amp; pass &#x27;https absolute-form 거부 HTTP 400&#x27; || fail &quot;https absolute-form 거부 HTTP 400 (status=${https_status:-없음})&quot;
+
+forward=$(curl -sS --max-time 5 --proxy &quot;http://127.0.0.1:$SERVER_PORT&quot; \
+    --noproxy &#x27;&#x27; &quot;http://127.0.0.1:$BACKEND_A_PORT/&quot;)
+[[ &quot;$forward&quot; == &#x27;backend A&#x27; ]] &amp;&amp; pass &#x27;포워드 프록시&#x27; || fail &quot;포워드 프록시 (body=&#x27;$forward&#x27;)&quot;</code></pre>
+</details><details class="codebox"><summary>큰 파일 전송 중 클라이언트 중도 종료 뒤 서버 생존 검사 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">scripts/functional_test.sh:197–204행</div>
+<pre><code># 느린 수신자가 큰 파일 전송 도중 연결을 닫아도 서버가 살아 있는지 봅니다.
+curl -sS --limit-rate 16k --max-time 0.2 \
+    &quot;http://127.0.0.1:$SERVER_PORT/large-test.bin&quot; -o /dev/null \
+    2&gt; &quot;$BUILD_DIR/client_abort.log&quot; || true
+sleep 0.2
+status=$(status_for &quot;http://127.0.0.1:$SERVER_PORT/&quot;)
+[[ &quot;$status&quot; == 200 ]] &amp;&amp; pass &#x27;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존&#x27; || \
+    fail &quot;큰 파일 수신 중 클라이언트 종료 뒤 서버 생존 (status=$status)&quot;</code></pre>
+</details>
+</article></div></section><section class="stage" id="stage-9"><header class="stage-head"><div class="stage-no">9</div><div><p class="eyebrow">9단계</p><h2>산출물</h2><p>빌드·호환성·사용법·인계 기록을 정리합니다. 결과물을 다른 사람이 다시 빌드하고 설계 흐름을 따라갈 수 있게 합니다.</p></div></header><div class="chapters"><article class="chapter" id="9-1">
+<div class="chapter-head"><div><span class="chapter-id">9-1</span><h3>빌드 다듬기</h3></div><span class="badge unverified">코드 상태 미확인 또는 보류</span></div>
+<p class="definition"><strong>정의</strong> · 빌드 경고 정책과 깨끗한 복제본에서의 빌드를 정리하는 구간이다. 지도에는 -Werror 선택이 보류된 상태로 적혀 있다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 빌드·호환성·사용법·인계 기록을 정리합니다. 결과물을 다른 사람이 다시 빌드하고 설계 흐름을 따라갈 수 있게 합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: -Werror 여부, 깨끗한 복제본에서 빌드.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>현재 C11 경고·링크 설정</code><br><span class="muted">확인 위치: <code>Makefile:1–6행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">CFLAGS  := $(CSTD) $(WARN) -g -O0 -Iinclude $(THREAD_FLAGS)</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>-Werror 여부, 깨끗한 복제본에서 빌드. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>현재 C11 경고·링크 설정 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">Makefile:1–6행</div>
+<pre><code>CC      := cc
+CSTD    := -std=c11
+WARN    := -Wall -Wextra -Wpedantic
+THREAD_FLAGS := -pthread
+CFLAGS  := $(CSTD) $(WARN) -g -O0 -Iinclude $(THREAD_FLAGS)
+LDFLAGS := $(THREAD_FLAGS)</code></pre>
+</details><details class="codebox"><summary>ASan·TSan·test·clean target <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">Makefile:31–61행</div>
+<pre><code>asan: CFLAGS  += -fsanitize=address,undefined -fno-omit-frame-pointer
+asan: LDFLAGS += -fsanitize=address,undefined
+asan: clean all
+
+tsan: CFLAGS += -fsanitize=thread -fno-omit-frame-pointer
+tsan: LDFLAGS += -fsanitize=thread
+tsan: clean all
+
+$(TEST_HTTP_BIN): $(TEST_HTTP_SRC) include/http.h | build
+	$(CC) $(CFLAGS) $(TEST_HTTP_SRC) $(LDFLAGS) -o $@
+
+$(TEST_MIME_BIN): $(TEST_MIME_SRC) include/mime.h | build
+	$(CC) $(CFLAGS) $(TEST_MIME_SRC) $(LDFLAGS) -o $@
+
+$(TEST_ROUTE_BIN): $(TEST_ROUTE_SRC) include/route.h | build
+	$(CC) $(CFLAGS) $(TEST_ROUTE_SRC) $(LDFLAGS) -o $@
+
+test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN)
+	./$(TEST_HTTP_BIN)
+	./$(TEST_MIME_BIN)
+	./$(TEST_ROUTE_BIN)
+
+test-asan: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+test-asan: LDFLAGS += -fsanitize=address,undefined
+test-asan: clean test
+
+run: all
+	./$(BIN)
+
+clean:
+	rm -rf build</code></pre>
+</details><details class="codebox"><summary>보류 항목 <span class="kind">작업 지시서에 따라 미결정</span></summary>
+<div class="source">03_stage2_to_9_curriculum.md · 9-1</div>
+<pre><code>-Werror 적용 여부를 먼저 묻도록 되어 있어 아직 추가하지 않았습니다.
+현재 Mac 작업 디렉터리에서 make와 make test는 확인했습니다. clean clone은 만들지 않았습니다.</code></pre>
+</details>
+</article><article class="chapter" id="9-2">
+<div class="chapter-head"><div><span class="chapter-id">9-2</span><h3>Linux에서도 지어지는지</h3></div><span class="badge unverified">코드 상태 미확인 또는 보류</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 Linux에서의 빌드 가능성을 확인하는 계획이다. 지도에는 Docker가 없어 실행하지 못했다고 기록되어 있다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 빌드·호환성·사용법·인계 기록을 정리합니다. 결과물을 다른 사람이 다시 빌드하고 설계 흐름을 따라갈 수 있게 합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: Docker로 확인하거나 확인 못 했다고 적기.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>Linux 확인 결과</code><br><span class="muted">확인 위치: <code>터미널 확인: command -v docker → 빈 출력</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code">Linux 빌드와 make test는 실행하지 않았습니다. Docker나 이미지를 설치·다운로드하지 않았습니다. README에는 macOS에서 확인했다고 기록했습니다.</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>Docker로 확인하거나 확인 못 했다고 적기. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>Linux 확인 결과 <span class="kind">미실행 — 환경에 Docker가 없음</span></summary>
+<div class="source">터미널 확인: command -v docker → 빈 출력</div>
+<pre><code>Linux 빌드와 make test는 실행하지 않았습니다. Docker나 이미지를 설치·다운로드하지 않았습니다. README에는 macOS에서 확인했다고 기록했습니다.</code></pre>
+</details>
+</article><article class="chapter" id="9-3">
+<div class="chapter-head"><div><span class="chapter-id">9-3</span><h3>README</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “README”이라는 주제를 다룬다. 구현·확인 목표는 “구조 · 실행법 · 직접 잰 결과 · 한계”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 빌드·호환성·사용법·인계 기록을 정리합니다. 결과물을 다른 사람이 다시 빌드하고 설계 흐름을 따라갈 수 있게 합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: 구조 · 실행법 · 직접 잰 결과 · 한계.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>프로젝트 목적·실행법·요청 흐름</code><br><span class="muted">확인 위치: <code>README.md:1–33행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code"># C 웹서버 · 프록시</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>구조 · 실행법 · 직접 잰 결과 · 한계. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>프로젝트 목적·실행법·요청 흐름 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">README.md:1–33행</div>
+<pre><code># C 웹서버 · 프록시
+
+macOS에서 C와 POSIX 소켓 API로 만든 학습용 HTTP 서버입니다. 정적 파일과 CGI를 제공하고, 설정 파일에 따라 리버스 프록시와 `-f` 포워드 프록시를 실행합니다. 여러 연결은 고정 크기 스레드 풀에서 처리합니다.
+
+## 빌드와 실행
+
+```sh
+make
+./build/server
+```
+
+| 인자 | 기본값 | 기능 |
+|---|---:|---|
+| `-p PORT` | `8080` | 서버가 듣는 포트 |
+| `-r ROOT` | `./www` | 정적 파일과 CGI의 문서 루트 |
+| `-b BACKLOG` | `128` | 커널의 연결 대기열 크기 힌트 |
+| `-w WORKERS` | `8` | 스레드 풀의 일꾼 수 (1–256) |
+| `-t SECONDS` | `5` | 클라이언트·업스트림 소켓 제한 시간 |
+| `-c FILE` | 없음 | 리버스 프록시 규칙 파일 |
+| `-f` | 꺼짐 | HTTP 포워드 프록시 사용 |
+| `-h` | — | 사용법 출력 |
+
+종료할 때는 `Ctrl+C`를 누릅니다. 서버는 새 연결 수락을 중단하고 대기열에 들어온 연결을 처리한 뒤 일꾼 스레드를 정리합니다.
+
+## 요청 처리 흐름
+
+1. `main.c`가 인자를 읽고 듣는 소켓을 준비합니다.
+2. `accept()`가 클라이언트 연결을 받아 새 연결 소켓 번호를 만듭니다.
+3. `pool.c`의 고정 스레드 풀이 연결 번호를 일꾼에게 넘깁니다.
+4. `conn.c`가 요청을 읽고 `http.c`가 요청 줄·헤더·본문 경계를 해석합니다.
+5. absolute-form HTTP 요청은 `-f` 설정에서 포워드 프록시로 전달합니다. 나머지는 라우팅 규칙에 맞으면 리버스 프록시로 보내고, 맞는 규칙이 없으면 CGI 또는 정적 파일로 처리합니다.
+6. 응답을 보낸 뒤 연결을 유지하거나 닫습니다. 설정 제한 시간, 오류 응답, 프록시 연결은 연결 종료 경로를 사용합니다.
+</code></pre>
+</details><details class="codebox"><summary>지원 범위·부하 실측·코드 작성 기록·남은 항목 <span class="kind">실제 프로젝트 코드</span></summary>
+<div class="source">README.md:65–107행</div>
+<pre><code>## 구현 범위와 제한
+
+- HTTP/1.0과 HTTP/1.1 요청, `GET`·`POST`, `Content-Length` 본문, 연결 유지, 정적 파일, CGI를 지원합니다.
+- 리버스 프록시는 `Host`와 경로 접두사로 백엔드를 선택하고, 연결 실패에는 502, 연결·첫 응답 제한 시간에는 504를 보냅니다.
+- `-f`는 `http://` absolute-form 요청을 전달합니다.
+- 청크 방식 본문(Transfer-Encoding)은 지원하지 않습니다.
+- HTTPS 터널을 만드는 `CONNECT`는 501로 거절합니다. `https://` absolute-form도 400으로 거절합니다.
+- TLS, 캐시(선택 구간 7-6), 큰 요청의 무제한 스트리밍은 구현 범위 밖입니다. 요청 헤더와 본문에는 고정 상한이 있습니다.
+- 스레드 하나가 연결 하나를 맡아 연결이 닫힐 때까지 처리합니다. 따라서 keep-alive 연결이 많으면 각 연결이 일꾼을 점유합니다. 부하 측정에서 기본 8개 일꾼은 동시 100개 keep-alive 요청을 잘 처리하지 못했습니다. 일꾼을 128개로 설정한 같은 측정에서는 실패가 0건이었습니다. 실제 배포에 적합한 값이라는 뜻은 아니며 이 수치는 이 Mac에서 수행한 로컬 학습 측정입니다.
+- macOS에서 빌드와 검사를 확인했습니다. Linux 빌드는 실행하지 않았습니다.
+
+## 검사
+
+```sh
+make test
+./scripts/functional_test.sh
+make test-asan
+make asan
+make tsan
+```
+
+`make test`는 파서·MIME·라우팅 단위 검사를 실행합니다. 기능 스크립트는 정적 파일, CGI, 리버스·포워드 프록시, 오류 응답, 동시 접속 20개, 클라이언트 중도 종료, 파일 디스크립터 수와 좀비 프로세스 수를 검사합니다. 실제 실행 결과와 ApacheBench 측정 전문은 [`docs/TUTORIAL_LOG.md`](docs/TUTORIAL_LOG.md)와 [`docs/benchmarks/apachebench_2026-11-25.txt`](docs/benchmarks/apachebench_2026-11-25.txt)에 기록했습니다.
+
+### ApacheBench 결과 요약
+
+각 조건은 요청 10,000개, 동시성 100, 세 번 측정했습니다. 표는 세 실행의 `Requests per second`와 실패 수를 원문 그대로 옮겼습니다.
+
+| 일꾼 수 | 연결 | 초당 요청 수 (3회) | 실패 요청 (3회) |
+|---:|---|---|---|
+| 8 | 매 요청 새 연결 | 10166.16, 9556.20, 10283.50 | 0, 0, 0 |
+| 8 | keep-alive | 325.80, 325.71, 325.89 | 48, 48, 47 |
+| 128 | 매 요청 새 연결 | 9257.13, 9384.72, 7153.99 | 0, 0, 0 |
+| 128 | keep-alive | 14854.51, 15430.55, 15031.22 | 0, 0, 0 |
+
+## 코드 작성 방식
+
+이 프로젝트의 코드는 사용자의 지시에 따라 Codex가 작성·수정했습니다. 사용자는 설계 우선순위와 학습 범위를 정했고, 실행 환경의 터미널 결과를 공유했습니다. 빌드·검사와 성능 숫자는 실행한 결과만 기록했습니다.
+
+## 아직 끝나지 않은 항목
+
+- 6-5의 순차 처리·연결별 스레드·스레드 풀 모델을 같은 조건에서 비교하는 실험은 하지 않았습니다. 순차 버전을 복원하기 위한 작업 트리나 저장 상태 변경 전 사용자의 승인이 필요합니다.
+- 9-1의 `-Werror` 적용 여부는 작업 지시서가 먼저 물으라고 정해 두어 적용하지 않았습니다.
+- Docker가 설치되어 있지 않아 9-2 Linux 빌드는 하지 않았습니다. 설치하거나 이미지를 내려받지 않았습니다.</code></pre>
+</details>
+</article><article class="chapter" id="9-4">
+<div class="chapter-head"><div><span class="chapter-id">9-4</span><h3>통합 지도와 학습 노트를 위한 자료 넘기기</h3></div><span class="badge built">코드·기록은 있음 · 학습 확인은 별도</span></div>
+<p class="definition"><strong>정의</strong> · 이 구간은 “통합 지도와 학습 노트를 위한 자료 넘기기”이라는 주제를 다룬다. 구현·확인 목표는 “HANDOFF_FOR_MAP.md”이다.</p>
+<p class="why"><strong>전체 흐름에서 왜 필요한가</strong> · 빌드·호환성·사용법·인계 기록을 정리합니다. 결과물을 다른 사람이 다시 빌드하고 설계 흐름을 따라갈 수 있게 합니다.</p>
+<h4>자연어 의도와 코드의 1:1 대응</h4>
+<table class="mapping"><tbody><tr><th>자연어로 정한 결과</th><td>이 구간에서 만들 결과: HANDOFF_FOR_MAP.md.</td></tr>
+<tr><th>코드에서 맡는 자리</th><td><code>설계도·지도 인계 문서</code><br><span class="muted">확인 위치: <code>docs/HANDOFF_FOR_MAP.md:1–50행</code></span></td></tr>
+<tr><th>코드에서 바로 찾을 표현</th><td><code class="inline-code"># 설계도·진행 지도 인계 자료</code><br><span class="muted">이 한 줄 또는 구문이 위 결과를 구현하는 핵심 진입점입니다. 세부 동작은 아래 발췌에서 이어서 읽습니다.</span></td></tr></tbody></table>
+<div class="handoff"><strong>앞 단계에서 받아 다음 단계로 넘기는 것</strong><br>HANDOFF_FOR_MAP.md. 이 결과는 다음 단계의 입력으로 이어지거나, 이 구간에서 확인할 출력·기록이 된다.</div>
+<details class="codebox"><summary>설계도·지도 인계 문서 <span class="kind">실제 프로젝트 문서</span></summary>
+<div class="source">docs/HANDOFF_FOR_MAP.md:1–50행</div>
+<pre><code># 설계도·진행 지도 인계 자료
+
+이 문서는 현재 프로젝트의 실제 코드 위치를 설계도와 진행 지도에서 확인할 수 있도록 만든 인계 자료입니다. 발췌 행은 작성 시점의 소스 기준이며, 코드를 바꾸면 다시 생성해야 합니다.
+
+- 확인 시각: 2026-11-25 15:15 KST
+- 프로젝트 루트: `/Users/gyaroron/Krafton_Jungle_SWAI_Lab/c-webserver-proxy`
+- 규칙: 코드가 없는 구간을 있는 것처럼 표시하지 않습니다.
+
+## 파일 목록과 행 수
+
+| 경로 | 행 수 | 역할 |
+|---|---:|---|
+| `src/cgi.c` | 266 | CGI fork/exec와 입출력 중계 |
+| `src/config.c` | 100 | 명령줄 설정 |
+| `src/conn.c` | 329 | 한 연결의 HTTP 상태 머신과 처리 분기 |
+| `src/http.c` | 190 | 요청 줄·헤더·본문 길이 파싱 |
+| `src/log.c` | 42 | 여러 스레드에서 줄 단위 로그 보호 |
+| `src/main.c` | 196 | 인자·신호·listen·accept·스레드 풀 종료 |
+| `src/mime.c` | 38 | 파일 확장자별 MIME 형식 |
+| `src/net.c` | 232 | listen·connect·timeout·poll·send 반복 |
+| `src/pool.c` | 164 | 고정 크기 pthread 스레드 풀과 대기열 |
+| `src/proxy.c` | 406 | 리버스/포워드 프록시 요청·응답 중계 |
+| `src/response.c` | 74 | HTTP 상태 줄·헤더·오류 응답 |
+| `src/route.c` | 212 | 라우트 파일·호스트·경로·round-robin |
+| `src/static.c` | 151 | 정적 파일 경로 검사·전송 |
+| `include/cgi.h` | 10 | 헤더 선언 또는 프로젝트 설정 |
+| `include/config.h` | 23 | 헤더 선언 또는 프로젝트 설정 |
+| `include/conn.h` | 11 | 헤더 선언 또는 프로젝트 설정 |
+| `include/http.h` | 42 | 헤더 선언 또는 프로젝트 설정 |
+| `include/log.h` | 8 | 헤더 선언 또는 프로젝트 설정 |
+| `include/mime.h` | 6 | 헤더 선언 또는 프로젝트 설정 |
+| `include/net.h` | 18 | 헤더 선언 또는 프로젝트 설정 |
+| `include/pool.h` | 15 | 헤더 선언 또는 프로젝트 설정 |
+| `include/proxy.h` | 25 | 헤더 선언 또는 프로젝트 설정 |
+| `include/response.h` | 13 | 헤더 선언 또는 프로젝트 설정 |
+| `include/route.h` | 37 | 헤더 선언 또는 프로젝트 설정 |
+| `include/static.h` | 10 | 헤더 선언 또는 프로젝트 설정 |
+| `tests/test_http.c` | 91 | HTTP 파서 단위 검사 |
+| `tests/test_mime.c` | 21 | MIME 단위 검사 |
+| `tests/test_route.c` | 46 | 라우팅 단위 검사 |
+| `scripts/check_env.sh` | 45 | 헤더 선언 또는 프로젝트 설정 |
+| `scripts/functional_test.sh` | 225 | 통합 기능·동시성·자원 검사 |
+| `Makefile` | 61 | 빌드 및 검사 대상 |
+| `README.md` | 108 | 사용법·범위·측정 요약 |
+| `routes.conf.example` | 2 | 리버스 프록시 규칙 예시 |
+| `docs/TUTORIAL_LOG.md` | 1032 | 실제 진행·검사 기록 |
+| `docs/benchmarks/apachebench_2026-11-25.txt` | 694 | ApacheBench 원문 |
+| `docs/benchmarks/summary_2026-11-25.md` | 12 | 부하 측정 요약 |
+| `docs/benchmarks/leaks_2026-11-25.txt` | 9 | leaks 실행 결과 |
+| `docs/HANDOFF_FOR_MAP.md` | 1861 | 설계도와 지도 인계 자료; 이 표를 포함한 최종 행 수 |</code></pre>
+</details><details class="codebox"><summary>측정 원문과 학습 기록 전문 <span class="kind">실제 프로젝트 기록</span></summary>
+<div class="source">docs/HANDOFF_FOR_MAP.md:113행부터 끝까지</div>
+<pre><code>ApacheBench 세 조건의 원문 결과와 docs/TUTORIAL_LOG.md 전문이 handoff 뒤쪽에 포함되어 있습니다.</code></pre>
+</details>
+</article></div></section>
+<footer><p><strong>자료 근거</strong> · 진행 지도 <code>c_webserver_proxy_progress_map.html</code>, 프로젝트 코드·검사 기록 및 튜토리얼 설계서. 지도 기준 요약: 코드 구현·검사와 학습 확인을 분리합니다. 마지막 학습 기록은 2026-11-25 16:22 KST 6-2입니다. 6-1 연결별 스레드 구현은 별도 로컬 브랜치에서 빌드·단위 검사·기능 검사·TSan 검사를 마쳤습니다. 6-5 세 모델 측정은 같은 Mac에서 모델별 4회 실행했습니다. 순차 기준은 과거 1단계 커밋이 아니라 전체 기능을 유지한 비교용 브랜치입니다. 의도적으로 잘못된 &amp;conn_fd 전달 실험과 6-5 개념 비교표의 학습자 답변은 아직 하지 않았습니다. 9-1 -Werror 선택·clean clone, 9-2 Linux 빌드는 미완료이며, 선택 7-6은 시작하지 않았습니다. 같은 시각에 docs/C_WEB_SERVER_PROXY_CODE_TEXTBOOK.html을 생성했습니다. 1-1~9-4 구간을 교재 형태로 연결한 참고 자료이며, 학습 완료 상태는 바꾸지 않았습니다. 1단계의 필수 암기 로직을 실제 src/net.c·src/main.c·src/conn.c·src/response.c 발췌와 줄별 해설로 docs/C_WEB_SERVER_PROXY_CODE_TEXTBOOK.html의 #stage-1에 추가했습니다. 현재 학습 위치와 완료 상태는 바꾸지 않았습니다.</p><p>7-6은 선택 구간이며 사용자가 진행을 선택하기 전에는 구현하지 않습니다. 9-1의 빌드 경고 정책 선택과 9-2의 Linux 검증은 지도에 미결정·미실행으로 기록되어 있습니다. 이 교재의 코드를 복사해 실행하기 전에는 해당 구간의 전체 함수 맥락과 현재 소스 행을 다시 확인해야 합니다.</p><p>생성 파일: <code>/Users/gyaroron/Krafton_Jungle_SWAI_Lab/c-webserver-proxy/docs/C_WEB_SERVER_PROXY_CODE_TEXTBOOK.html</code></p></footer></main></div></body></html>
