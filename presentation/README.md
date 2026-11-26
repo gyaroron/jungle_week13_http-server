@@ -23,6 +23,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f      # th
 ## 1. 서버가 지켜야 할 세 가지
 
 ![서버가 지켜야 할 세 가지](images/story_01_requirements.svg)
+<img width="600" height="352" alt="image" src="https://github.com/user-attachments/assets/8a0d8456-7bda-4ecd-b31b-6f9edf4d73ed" />
 
 | 요구사항 | 뜻 |
 |---|---|
