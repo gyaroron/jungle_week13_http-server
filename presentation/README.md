@@ -110,7 +110,39 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 - 25,912 → 70,110은 `9ded267`이 한 번에 바꾼 로그 thread, 캐시 전역 잠금 제거, deadline 방식을 따로 측정하지 못해 **어느 변경의 몫인지 말할 수 없습니다.** 캐시 HIT 자체는 HEAD에서 30,261 → 70,110(약 2.3배)입니다.
 - 이전 README의 "15,105 → 23,364 req/s"는 서로 다른 시점의 단회 측정이라 이 표로 대체했습니다.
-- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` event loop로 연결과 스레드를 분리하는 것입니다(다음 단계, 아직 구현하지 않았습니다).
+- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` event loop로 연결과 스레드를 분리하는 것이고, 아래처럼 **`feature/event-loop` 브랜치에 구현하고 테스트했습니다.**
+
+### 4-1. event loop 구현 (`-e`, `feature/event-loop` 브랜치)
+
+![event loop](images/07_event_loop.svg)
+
+**구조:** loop thread 하나가 `kqueue`(macOS) 또는 `epoll`(Linux)로 listen socket과 모든 대기 연결을 감시합니다. 헤더 끝(`\r\n\r\n`)까지 도착한 연결만 worker에 넘기고, 응답 뒤 keep-alive로 다음 요청을 기다리는 연결은 loop가 다시 맡습니다. 그래서 쉬는 연결이 worker를 붙잡지 않습니다.
+
+| 부분 | 파일 · 함수 | 하는 일 |
+|---|---|---|
+| loop thread | `src/evloop.c` `evloop_run()` | accept, one-shot 읽기 감시, worker에 넘기기, deadline 지나면 408/종료, 종료 신호 처리 |
+| 읽기 단계 | `src/conn.c` `conn_read_available()` | 소켓은 Blocking으로 두고 `recv(..., MSG_DONTWAIT)`로 지금 온 바이트만 읽음 |
+| 처리 단계 | `src/conn.c` `conn_resume()` | 기존 상태 머신(PARSING → ROUTING → RESPONDING)을 그대로 실행하고, 다음 요청이 아직 없으면 `PARKED`를 돌려줌 |
+| 되돌리기 | worker → self-pipe → loop | worker가 keep-alive 연결을 목록에 넣고 pipe에 1바이트를 써서 loop를 깨움 |
+| 실행 | `./build/server -e` | 기본값은 기존 thread pool이고, `-e`를 주면 event loop로 동작 |
+
+**테스트 (2026-11-26, 로컬)**
+
+| 검사 | 결과 |
+|---|---|
+| 단위 테스트 (`make test`, `make test-asan`) | 4개 스위트 통과. 새 `tests/test_conn_event.c`가 socketpair로 헤더 일부 → 대기, 헤더 끝 → 처리, keep-alive → `PARKED`, pipelining 2건, 상대 종료, 잘못된 요청 400을 검사 |
+| 기능 테스트 (`SERVER_MODE=event ./scripts/functional_test.sh`) | **25/25** (기존 24개 + "쉬는 keep-alive 연결 12개(worker 4개)와 함께 새 요청 즉시 처리"). 기본 모드는 24/24로 그대로 |
+| ASan + UBSan · TSan | 두 모드 모두 기능 테스트 통과, sanitizer 보고 0 |
+| 부하 (worker 8 · keep-alive) | thread pool **332 req/s**, 실패 46~48건 → event loop **64,656 req/s, 실패 0건** (3회 중앙값) |
+| 쉬는 연결 N개 + 새 GET (worker 8) | thread pool은 200개 중 136개만 응답(= worker 8 + 대기열 128), 새 GET은 503. event loop는 200개 · 1000개 모두 응답, 새 GET 200 (0.6~0.8 ms) |
+
+**테스트하다 고친 문제:** TSan 빌드에서 event 모드 서버가 SIGTERM을 받고도 끝나지 않았습니다. macOS TSan은 시그널 핸들러를 가로챈 함수에 들어갈 때까지 미루는데, loop는 `kevent`만 부르고 있었기 때문입니다. SIGINT/SIGTERM을 `EVFILT_SIGNAL`로 kqueue에도 넣어, 핸들러가 늦어도 loop가 종료 요청을 받게 고쳤습니다.
+
+**남은 한계**
+- 요청 처리(정적 파일 · CGI · proxy 응답 송신, 큰 본문 수신)는 여전히 worker에서 Blocking으로 돕니다. 느린 다운로드나 느린 본문 업로드는 deadline까지 worker 하나를 씁니다.
+- Linux `epoll` 경로는 이 Mac에서 빌드 · 실행하지 못했습니다. stub 헤더로 형식 검사(`-fsyntax-only`)만 통과했습니다.
+- 연결 하나에 8 KiB 읽기 버퍼를 힙에 둡니다. 1만 연결이면 약 80 MiB입니다. 마감 검사는 100 ms마다 대기 연결 목록 전체를 훑습니다.
+- 측정 원문: [`docs/benchmarks/apachebench_2026-11-26_event_loop.txt`](../docs/benchmarks/apachebench_2026-11-26_event_loop.txt)
 
 > 모든 수치는 같은 Mac의 loopback에서 `-O0` debug build로 2026-11-26 한 세션에 측정했고, 실행마다 흔들립니다(예: 같은 조건 3회가 24,550~31,992). 어제(2026-11-25) 기록과 값이 다른 것도 이 때문입니다.
 > 원본 출력: [`docs/benchmarks/apachebench_2026-11-26_controlled.txt`](../docs/benchmarks/apachebench_2026-11-26_controlled.txt)
@@ -164,7 +196,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 - 동시성 모델은 정답이 있는 문제가 아니라 **트레이드오프**입니다. 측정해 보기 전까지는 모릅니다.
 
 **다음 단계**
-1. `kqueue`/`epoll` 이벤트 루프 버전을 만들어 keep-alive 부하 재측정
+1. ~~`kqueue`/`epoll` 이벤트 루프 버전을 만들어 keep-alive 부하 재측정~~ → `feature/event-loop`에서 구현 · 측정 완료(4-1). 다음은 응답 송신까지 Non-blocking으로 옮기기와 Linux에서 `epoll` 경로 실행
 2. Linux(Docker)에서 빌드하고 `valgrind` 검사
 3. 헤더가 8 KiB 버퍼를 넘을 때 조용히 끊지 않고 431을 응답(현재는 로그만 남기고 연결을 닫음, `src/conn.c:141`)
 
@@ -180,7 +212,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | 상태 라인 + Content-Type/Length/Connection | ✅ | `src/response.c` `resp_format_head()` |
 | 정적 파일 · MIME · 403/404/500 | ✅ | `src/static.c` (realpath로 루트 이탈 차단), `src/mime.c` |
 | 동적 처리 (CGI 또는 백엔드 전달) | ✅ | `src/cgi.c` fork/execve/pipe, `src/proxy.c` |
-| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀(채택), 연결별 스레드 브랜치, CGI는 `fork()`. 순차 브랜치는 비교 기준선 |
+| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀(채택), 연결별 스레드 브랜치, CGI는 `fork()`, `feature/event-loop`의 `kqueue`/`epoll` event loop(`-e`). 순차 브랜치는 비교 기준선 |
 | Forward 또는 Reverse Proxy (1개 이상) | ✅ | 둘 다: `proxy_forward_cached()`, `proxy_reverse_cached()` + RR `route_pick()` |
 | 라우팅: 경로 또는 Host 기반 | ✅ | `src/route.c` `route_match()` (둘 다) |
 | CLI 인자 또는 설정 파일 | ✅ | `src/config.c` getopt, `routes.conf` |

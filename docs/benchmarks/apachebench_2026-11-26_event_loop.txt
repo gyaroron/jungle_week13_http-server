@@ -1,0 +1,42 @@
+# 2026-11-26 thread pool vs event loop (-e) · feature/event-loop
+
+같은 빌드(make 기본 -O0 debug)를 같은 세션에서 모드만 바꿔 측정했다. macOS loopback, 정적 `/` 169 bytes, 서버 로그는 /dev/null, ulimit -n 4096.
+처리량: `ab -q [-k] -n 10000 -c 100 http://127.0.0.1:PORT/`, 조건별 3회.
+idle 검사: python으로 keep-alive 연결 N개를 열어 각각 요청 1개를 보내고 응답을 받은 뒤 열어 둔 채, 2.5초 뒤 curl로 새 GET 1개의 시간과 상태 코드를 쟀다(-w 8, 조건별 1회).
+측정 커밋은 아래 'commit' 값이고, 그 위에 이 브랜치의 작업 트리 변경(event loop 구현)을 빌드했다.
+
+# start 2026-11-26 11:04:00 KST commit 7f98bc3 ulimit_n=4096
+pool w=8 nokeep run1 rps=28092.02 failed=0 keepalive_req=
+pool w=8 nokeep run2 rps=25860.84 failed=0 keepalive_req=
+pool w=8 nokeep run3 rps=24435.18 failed=0 keepalive_req=
+pool w=8 keep run1 rps=331.15 failed=48 keepalive_req=9952
+pool w=8 keep run2 rps=331.56 failed=46 keepalive_req=9954
+pool w=8 keep run3 rps=331.65 failed=48 keepalive_req=9953
+pool w=128 nokeep run1 rps=29380.74 failed=0 keepalive_req=
+pool w=128 nokeep run2 rps=25872.62 failed=0 keepalive_req=
+pool w=128 nokeep run3 rps=23936.62 failed=0 keepalive_req=
+pool w=128 keep run1 rps=85339.52 failed=0 keepalive_req=10000
+pool w=128 keep run2 rps=79734.64 failed=0 keepalive_req=10000
+pool w=128 keep run3 rps=70917.96 failed=0 keepalive_req=10000
+pool w=8 idle=200 served 136 of 200  | new GET time_s status = 0.000501 503
+pool w=8 idle=1000 served 136 of 1000  | new GET time_s status = 0.000567 503
+event w=8 nokeep run1 rps=33294.05 failed=0 keepalive_req=
+event w=8 nokeep run2 rps=29507.84 failed=0 keepalive_req=
+event w=8 nokeep run3 rps=29129.98 failed=0 keepalive_req=
+event w=8 keep run1 rps=94740.93 failed=0 keepalive_req=10000
+event w=8 keep run2 rps=63164.81 failed=0 keepalive_req=10000
+event w=8 keep run3 rps=64656.29 failed=0 keepalive_req=10000
+event w=128 nokeep run1 rps=34545.30 failed=0 keepalive_req=
+event w=128 nokeep run2 rps=25544.68 failed=0 keepalive_req=
+event w=128 nokeep run3 rps=25106.07 failed=0 keepalive_req=
+event w=128 keep run1 rps=79960.34 failed=0 keepalive_req=10000
+event w=128 keep run2 rps=82191.56 failed=0 keepalive_req=10000
+event w=128 keep run3 rps=64499.07 failed=0 keepalive_req=10000
+event w=8 idle=200 served 200 of 200  | new GET time_s status = 0.000756 200
+event w=8 idle=1000 served 1000 of 1000  | new GET time_s status = 0.000633 200
+# end 2026-11-26 11:08:33 KST
+
+## 해석
+- pool w=8 idle: 136 = worker 8 + 대기열 128. 이 수를 넘는 연결과 새 GET은 pool_submit()의 EAGAIN 경로로 503을 받았다.
+- event w=8 idle: 쉬는 연결은 kqueue가 감시하고 worker를 붙잡지 않으므로 200개 · 1000개 모두 응답을 받았고 새 GET도 200이었다.
+- event 모드의 Linux epoll 경로는 이 Mac에서 빌드 · 실행하지 못했다. stub 헤더로 형식 검사(-fsyntax-only)만 통과했다.

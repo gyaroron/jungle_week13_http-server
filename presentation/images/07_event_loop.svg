@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 630" width="960" height="630" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="630" rx="14" fill="#fcfcfb"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker></defs>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">event loop (-e) 구현 · feature/event-loop</text>
+<text x="32" y="68" font-size="13" fill="#52514e">쉬는 연결은 kqueue(macOS) / epoll(Linux)이 감시하고, 헤더가 다 온 요청만 worker가 처리합니다 · 2026-11-26 같은 세션 측정</text>
+<rect x="32" y="96" width="180" height="62" rx="10" fill="#eaf2fc" stroke="#2a78d6" stroke-width="1.5"/><text x="122.0" y="122" text-anchor="middle" font-size="14" font-weight="700" fill="#0b0b0b">loop thread 1개</text><text x="122.0" y="142" text-anchor="middle" font-size="11.5" fill="#52514e">accept · kevent/epoll_wait</text>
+<rect x="262" y="96" width="200" height="62" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.5"/><text x="362.0" y="122" text-anchor="middle" font-size="14" font-weight="700" fill="#0b0b0b">헤더 끝(\r\n\r\n) 도착?</text><text x="362.0" y="142" text-anchor="middle" font-size="11.5" fill="#52514e">conn_read_available()</text>
+<rect x="512" y="96" width="190" height="62" rx="10" fill="#fdf0ea" stroke="#eb6834" stroke-width="1.5"/><text x="607.0" y="122" text-anchor="middle" font-size="14" font-weight="700" fill="#0b0b0b">worker N개</text><text x="607.0" y="142" text-anchor="middle" font-size="11.5" fill="#52514e">conn_resume(): 처리 · 응답</text>
+<rect x="752" y="96" width="176" height="62" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-width="1.5"/><text x="840.0" y="122" text-anchor="middle" font-size="14" font-weight="700" fill="#0b0b0b">keep-alive?</text><text x="840.0" y="142" text-anchor="middle" font-size="11.5" fill="#52514e">PARKED → loop로 반환</text>
+<line x1="212" y1="127" x2="258" y2="127" stroke="#52514e" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="462" y1="127" x2="508" y2="127" stroke="#52514e" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="702" y1="127" x2="748" y2="127" stroke="#52514e" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M840 158 V184 H122 V162" fill="none" stroke="#2a78d6" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="480" y="200" text-anchor="middle" font-size="12" fill="#2a78d6">다음 요청을 기다리는 동안 worker를 붙잡지 않음 · deadline 지나면 loop가 408/종료</text>
+<text x="32" y="240" font-size="15" font-weight="700" fill="#0b0b0b">① worker 8 · keep-alive</text><text x="32" y="260" font-size="12" fill="#52514e">ab -k -n 10000 -c 100 · 3회 중앙값 (req/s)</text>
+<line x1="182.0" y1="274" x2="182.0" y2="366" stroke="#e4e3de"/><text x="182.0" y="382" text-anchor="middle" font-size="11" fill="#8a8984">0</text>
+<line x1="282.0" y1="274" x2="282.0" y2="366" stroke="#e4e3de"/><text x="282.0" y="382" text-anchor="middle" font-size="11" fill="#8a8984">40k</text>
+<line x1="382.0" y1="274" x2="382.0" y2="366" stroke="#e4e3de"/><text x="382.0" y="382" text-anchor="middle" font-size="11" fill="#8a8984">80k</text>
+<text x="172" y="299" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">thread pool</text><path d="M182 280 H181 q4 0 4 4 V304 q0 4 -4 4 H182 Z" fill="#8a8984"/><text x="193.0" y="293" font-size="13" font-weight="700" fill="#0b0b0b">332</text><text x="193.0" y="308" font-size="11" fill="#52514e">실패 46~48건</text>
+<text x="172" y="349" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">event loop</text><path d="M182 330 H339.64 q4 0 4 4 V354 q0 4 -4 4 H182 Z" fill="#2a78d6"/><text x="351.6" y="343" font-size="13" font-weight="700" fill="#0b0b0b">64,656</text><text x="351.6" y="358" font-size="11" fill="#52514e">실패 0건</text>
+<text x="500" y="240" font-size="15" font-weight="700" fill="#0b0b0b">② 그 밖의 조건 (새 연결 w8 · keep-alive w128)</text><text x="500" y="260" font-size="12" fill="#52514e">ab -n 10000 -c 100 · 3회 중앙값 (req/s)</text>
+<line x1="650.0" y1="274" x2="650.0" y2="466" stroke="#e4e3de"/><text x="650.0" y="482" text-anchor="middle" font-size="11" fill="#8a8984">0</text>
+<line x1="744.0" y1="274" x2="744.0" y2="466" stroke="#e4e3de"/><text x="744.0" y="482" text-anchor="middle" font-size="11" fill="#8a8984">50k</text>
+<line x1="838.0" y1="274" x2="838.0" y2="466" stroke="#e4e3de"/><text x="838.0" y="482" text-anchor="middle" font-size="11" fill="#8a8984">100k</text>
+<text x="640" y="299" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">pool w8 · 새 연결</text><path d="M650 280 H694.61868 q4 0 4 4 V304 q0 4 -4 4 H650 Z" fill="#8a8984"/><text x="706.6" y="293" font-size="13" font-weight="700" fill="#0b0b0b">25,861</text><text x="706.6" y="308" font-size="11" fill="#52514e"></text>
+<text x="640" y="349" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">event w8 · 새 연결</text><path d="M650 330 H701.47504 q4 0 4 4 V354 q0 4 -4 4 H650 Z" fill="#2a78d6"/><text x="713.5" y="343" font-size="13" font-weight="700" fill="#0b0b0b">29,508</text><text x="713.5" y="358" font-size="11" fill="#52514e"></text>
+<text x="640" y="399" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">pool w128 · keep</text><path d="M650 380 H795.9018 q4 0 4 4 V404 q0 4 -4 4 H650 Z" fill="#8a8984"/><text x="807.9" y="393" font-size="13" font-weight="700" fill="#0b0b0b">79,735</text><text x="807.9" y="408" font-size="11" fill="#52514e"></text>
+<text x="640" y="449" text-anchor="end" font-size="13" font-weight="700" fill="#0b0b0b">event w128 · keep</text><path d="M650 430 H796.3248 q4 0 4 4 V454 q0 4 -4 4 H650 Z" fill="#2a78d6"/><text x="808.3" y="443" font-size="13" font-weight="700" fill="#0b0b0b">79,960</text><text x="808.3" y="458" font-size="11" fill="#52514e"></text>
+<rect x="32" y="504" width="896" height="104" rx="10" fill="#ffffff" stroke="#e4e3de"/>
+<text x="48" y="530" font-size="14" font-weight="700" fill="#0b0b0b">③ 쉬는 keep-alive 연결 N개를 열어 둔 채 새 GET 1개 (worker 8, 1회씩)</text>
+<text x="48" y="558" font-size="13" font-weight="700" fill="#0b0b0b">thread pool</text><text x="160" y="558" font-size="13" fill="#a32e2e">200개 중 136개만 응답 (= worker 8 + 대기열 128), 나머지와 새 GET은 503</text>
+<text x="48" y="582" font-size="13" font-weight="700" fill="#0b0b0b">event loop</text><text x="160" y="582" font-size="13" fill="#0a5c0a">200개 · 1000개 모두 응답, 새 GET은 200 (0.6~0.8 ms)</text>
+<text x="48" y="600" font-size="11.5" fill="#52514e">요청 처리(정적 · CGI · proxy 응답 송신)는 여전히 worker에서 Blocking으로 돕니다. Linux epoll 경로는 형식 검사만 통과했고 실행하지 못했습니다.</text>
+</svg>

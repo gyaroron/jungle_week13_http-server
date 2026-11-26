@@ -17,7 +17,8 @@ make
 | `-w WORKERS` | `8` | 스레드 풀의 일꾼 수 (1–256) |
 | `-t SECONDS` | `5` | 클라이언트·업스트림 소켓 제한 시간 |
 | `-c FILE` | 없음 | 리버스 프록시 규칙 파일 |
-| `-f` | 꺼짐 | HTTP 포워드 프록시 사용 |
+| `-f` | 꺼짐 | HTTP forward proxy 사용 |
+| `-e` | 꺼짐 | `kqueue`(macOS) / `epoll`(Linux) event loop 모드. 쉬는 keep-alive 연결은 loop가 감시하고, 헤더가 다 온 요청만 `-w`개 worker가 처리 |
 | `-h` | — | 사용법 출력 |
 
 종료할 때는 `Ctrl+C`를 누릅니다. 서버는 새 연결 수락을 중단하고 대기열에 들어온 연결을 처리한 뒤 일꾼 스레드를 정리합니다.
@@ -102,6 +103,8 @@ make
 - macOS에서 빌드와 검사를 확인했습니다. Linux 빌드는 실행하지 않았습니다.
 
 ## 검사
+
+event loop 모드(`-e`)는 같은 기능 검사를 `SERVER_MODE=event ./scripts/functional_test.sh`로 실행합니다. 이 모드에만 "쉬는 keep-alive 연결 12개(worker 4개)와 함께 새 요청 즉시 처리" 검사가 더해집니다. 측정 원문은 [`docs/benchmarks/apachebench_2026-11-26_event_loop.txt`](docs/benchmarks/apachebench_2026-11-26_event_loop.txt)에 있습니다.
 
 ```sh
 make test
