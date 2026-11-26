@@ -110,9 +110,9 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 - 25,912 → 70,110은 `9ded267`이 한 번에 바꾼 로그 thread, 캐시 전역 잠금 제거, deadline 방식을 따로 측정하지 못해 **어느 변경의 몫인지 말할 수 없습니다.** 캐시 HIT 자체는 HEAD에서 30,261 → 70,110(약 2.3배)입니다.
 - 이전 README의 "15,105 → 23,364 req/s"는 서로 다른 시점의 단회 측정이라 이 표로 대체했습니다.
-- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` event loop로 연결과 스레드를 분리하는 것이고, 아래처럼 **`feature/event-loop` 브랜치에 구현하고 테스트했습니다.**
+- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` event loop로 연결과 스레드를 분리하는 것이고, 아래처럼 **`feature/event-loop` 브랜치에서 구현하고 테스트한 뒤 `main`에 합쳤습니다.** `./build/server -e`로 실행합니다.
 
-### 4-1. event loop 구현 (`-e`, `feature/event-loop` 브랜치)
+### 4-1. event loop 구현 (`-e` 옵션)
 
 ![event loop](images/07_event_loop.svg)
 
@@ -196,7 +196,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 - 동시성 모델은 정답이 있는 문제가 아니라 **트레이드오프**입니다. 측정해 보기 전까지는 모릅니다.
 
 **다음 단계**
-1. ~~`kqueue`/`epoll` 이벤트 루프 버전을 만들어 keep-alive 부하 재측정~~ → `feature/event-loop`에서 구현 · 측정 완료(4-1). 다음은 응답 송신까지 Non-blocking으로 옮기기와 Linux에서 `epoll` 경로 실행
+1. ~~`kqueue`/`epoll` 이벤트 루프 버전을 만들어 keep-alive 부하 재측정~~ → 구현 · 측정 완료(4-1, `main`에 합침). 다음은 응답 송신까지 Non-blocking으로 옮기기와 Linux에서 `epoll` 경로 실행
 2. Linux(Docker)에서 빌드하고 `valgrind` 검사
 3. 헤더가 8 KiB 버퍼를 넘을 때 조용히 끊지 않고 431을 응답(현재는 로그만 남기고 연결을 닫음, `src/conn.c:141`)
 
@@ -212,7 +212,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | 상태 라인 + Content-Type/Length/Connection | ✅ | `src/response.c` `resp_format_head()` |
 | 정적 파일 · MIME · 403/404/500 | ✅ | `src/static.c` (realpath로 루트 이탈 차단), `src/mime.c` |
 | 동적 처리 (CGI 또는 백엔드 전달) | ✅ | `src/cgi.c` fork/execve/pipe, `src/proxy.c` |
-| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀(채택), 연결별 스레드 브랜치, CGI는 `fork()`, `feature/event-loop`의 `kqueue`/`epoll` event loop(`-e`). 순차 브랜치는 비교 기준선 |
+| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀(채택), 연결별 스레드 브랜치, CGI는 `fork()`, `kqueue`/`epoll` event loop(`-e`). 순차 브랜치는 비교 기준선 |
 | Forward 또는 Reverse Proxy (1개 이상) | ✅ | 둘 다: `proxy_forward_cached()`, `proxy_reverse_cached()` + RR `route_pick()` |
 | 라우팅: 경로 또는 Host 기반 | ✅ | `src/route.c` `route_match()` (둘 다) |
 | CLI 인자 또는 설정 파일 | ✅ | `src/config.c` getopt, `routes.conf` |
