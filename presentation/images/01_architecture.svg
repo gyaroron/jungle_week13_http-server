@@ -30,9 +30,9 @@
 
   <rect x="438" y="96" width="200" height="94" rx="10" class="core"/>
   <text x="538" y="124" text-anchor="middle" class="t">pool.c</text>
-  <text x="538" y="145" text-anchor="middle" class="s">원형 큐 128칸 (fd)</text>
-  <text x="538" y="163" text-anchor="middle" class="s">worker 스레드 N개 (기본 8)</text>
-  <text x="538" y="180" text-anchor="middle" class="c">mutex + cond ×2</text>
+  <text x="538" y="145" text-anchor="middle" class="s">circular queue 128칸 (fd)</text>
+  <text x="538" y="163" text-anchor="middle" class="s">worker thread N개 (기본 8)</text>
+  <text x="538" y="180" text-anchor="middle" class="c">queue 가득 → EAGAIN → 503</text>
 
   <rect x="676" y="96" width="252" height="94" rx="10" class="core"/>
   <text x="802" y="124" text-anchor="middle" class="t">conn.c → http.c</text>
@@ -48,7 +48,7 @@
   <path d="M802 190 L802 222" class="ln" marker-end="url(#a)"/>
   <rect x="300" y="226" width="628" height="52" rx="10" fill="#f3f2ef" stroke="#c9c8c2" stroke-width="1.5"/>
   <text x="322" y="250" class="t">CONN_ROUTING</text>
-  <text x="322" y="268" class="s">absolute-form? → 포워드 / route 규칙 매칭? → 리버스 / /cgi-bin/ → CGI / 그 외 → 정적</text>
+  <text x="322" y="268" class="s">absolute-form? → forward proxy / route 매칭? → reverse proxy / /cgi-bin/ → CGI / 그 외 → 정적</text>
 
   <!-- cache band -->
   <rect x="32" y="226" width="246" height="52" rx="10" fill="#e8f7f1" stroke="#1baf7a" stroke-width="1.5"/>
@@ -82,18 +82,18 @@
   <text x="591" y="362" text-anchor="middle" class="t">CGI (동적)</text>
   <text x="591" y="383" text-anchor="middle" class="c">fork + execve + pipe</text>
   <text x="591" y="403" text-anchor="middle" class="s">POST 본문 → stdin</text>
-  <text x="591" y="421" text-anchor="middle" class="s">QUERY_STRING 등 환경변수</text>
+  <text x="591" y="421" text-anchor="middle" class="s">QUERY_STRING · CONTENT_LENGTH 환경변수</text>
   <text x="591" y="439" text-anchor="middle" class="s">타임아웃 504 · 실패 500</text>
 
   <rect x="720" y="334" width="208" height="122" rx="10" class="out"/>
   <text x="824" y="362" text-anchor="middle" class="t">Static File</text>
   <text x="824" y="383" text-anchor="middle" class="c">-r ./www</text>
   <text x="824" y="403" text-anchor="middle" class="s">%XX 해독 · realpath 검사</text>
-  <text x="824" y="421" text-anchor="middle" class="s">MIME: html css js png jpg…</text>
+  <text x="824" y="421" text-anchor="middle" class="s">MIME: html · css · js · png · jpg</text>
   <text x="824" y="439" text-anchor="middle" class="s">403 / 404 / 405 / 500</text>
 
   <rect x="32" y="480" width="896" height="52" rx="10" fill="#ffffff" stroke="#c9c8c2" stroke-dasharray="5 4"/>
   <text x="52" y="504" class="t">response.c</text>
   <text x="150" y="504" class="s">HTTP/1.1 상태줄 + Content-Type · Content-Length · Connection · Date · Server 헤더</text>
-  <text x="150" y="522" class="s">net_send_all(): send()가 덜 보내도 끝까지 반복 전송 · SO_RCVTIMEO/SNDTIMEO 로 느린 클라이언트 차단</text>
+  <text x="150" y="522" class="s">net_send_all(): 끝까지 반복 전송 · 요청별 monotonic deadline 초과 → 408 · 송신은 SO_SNDTIMEO</text>
 </svg>

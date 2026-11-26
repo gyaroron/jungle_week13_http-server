@@ -1,0 +1,92 @@
+# 2026-11-26 ApacheBench 통제 재측정 (한 세션 · 같은 Mac loopback · make 기본 -O0 debug build)
+
+모든 버전을 `git archive <rev>`로 따로 빌드해 같은 시간대에 같은 명령으로 측정했다. 정적 `/` 응답 169 bytes, 서버 로그는 /dev/null.
+명령: `ab -q [-k] -n N -c C http://127.0.0.1:PORT/`. 캐시 끄기는 요청에 `Cookie` 헤더를 붙여 캐시를 우회시켰다(`src/cache.c` forbidden_request_header).
+측정 스크립트는 저장소 밖 임시 폴더에 있었고, 아래는 각 실행의 Requests per second / Failed requests / keep-alive로 처리된 요청 수를 옮긴 원문이다.
+
+# start 2026-11-26 10:35:27 KST
+model rev=dd5b3a3 ab-n2000-c50 run1 rps=22538.77 failed=0 non2xx=0 keepalive_req=0
+model rev=dd5b3a3 ab-n2000-c50 run2 rps=25820.78 failed=0 non2xx=0 keepalive_req=0
+model rev=dd5b3a3 ab-n2000-c50 run3 rps=25342.12 failed=0 non2xx=0 keepalive_req=0
+model rev=dd5b3a3 ab-n2000-c50 run4 rps=25513.78 failed=0 non2xx=0 keepalive_req=0
+model rev=d24fd3a ab-n2000-c50 run1 rps=17260.57 failed=0 non2xx=0 keepalive_req=0
+model rev=d24fd3a ab-n2000-c50 run2 rps=16208.11 failed=0 non2xx=0 keepalive_req=0
+model rev=d24fd3a ab-n2000-c50 run3 rps=12194.08 failed=0 non2xx=0 keepalive_req=0
+model rev=d24fd3a ab-n2000-c50 run4 rps=11364.67 failed=0 non2xx=0 keepalive_req=0
+model rev=f4f68da ab-n2000-c50 run1 rps=17380.88 failed=0 non2xx=0 keepalive_req=0
+model rev=f4f68da ab-n2000-c50 run2 rps=17206.52 failed=0 non2xx=0 keepalive_req=0
+model rev=f4f68da ab-n2000-c50 run3 rps=18320.89 failed=0 non2xx=0 keepalive_req=0
+model rev=f4f68da ab-n2000-c50 run4 rps=18189.42 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=8 nokeep run1 rps=12531.49 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=8 nokeep run2 rps=13310.63 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=8 nokeep run3 rps=11321.48 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=8 keep run1 rps=325.83 failed=47 non2xx=0 keepalive_req=9953
+ver rev=56ef9f8 w=128 nokeep run1 rps=12555.51 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=128 nokeep run2 rps=11678.33 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=128 nokeep run3 rps=12930.24 failed=0 non2xx=0 keepalive_req=0
+ver rev=56ef9f8 w=128 keep run1 rps=13614.46 failed=0 non2xx=0 keepalive_req=10000
+ver rev=56ef9f8 w=128 keep run2 rps=17359.63 failed=0 non2xx=0 keepalive_req=10000
+ver rev=56ef9f8 w=128 keep run3 rps=17675.43 failed=0 non2xx=0 keepalive_req=10000
+ver rev=78b04af w=8 nokeep run1 rps=17931.17 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=8 nokeep run2 rps=16998.19 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=8 nokeep run3 rps=17253.90 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=8 keep run1 rps=15637.61 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 nokeep run1 rps=15282.29 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 nokeep run2 rps=14656.67 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 nokeep run3 rps=14740.83 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 keep run1 rps=14324.96 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 keep run2 rps=15851.98 failed=0 non2xx=0 keepalive_req=0
+ver rev=78b04af w=128 keep run3 rps=16003.30 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=8 nokeep run1 rps=18257.20 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=8 nokeep run2 rps=17088.03 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=8 nokeep run3 rps=17928.79 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=8 keep run1 rps=328.31 failed=48 non2xx=0 keepalive_req=9952
+ver rev=eaa1fef w=128 nokeep run1 rps=16673.64 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=128 nokeep run2 rps=13568.19 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=128 nokeep run3 rps=16339.52 failed=0 non2xx=0 keepalive_req=0
+ver rev=eaa1fef w=128 keep run1 rps=23829.15 failed=0 non2xx=0 keepalive_req=10000
+ver rev=eaa1fef w=128 keep run2 rps=25912.24 failed=0 non2xx=0 keepalive_req=10000
+ver rev=eaa1fef w=128 keep run3 rps=26045.80 failed=0 non2xx=0 keepalive_req=10000
+ver rev=9e6883a w=8 nokeep run1 rps=24550.48 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=8 nokeep run2 rps=31992.32 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=8 nokeep run3 rps=28285.90 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=8 keep run1 rps=331.73 failed=48 non2xx=0 keepalive_req=9952
+ver rev=9e6883a w=8 keep run2 rps=331.58 failed=46 non2xx=0 keepalive_req=9954
+ver rev=9e6883a w=8 keep run3 rps=331.62 failed=46 non2xx=0 keepalive_req=9954
+ver rev=9e6883a w=128 nokeep run1 rps=29303.17 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=128 nokeep run2 rps=26266.23 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=128 nokeep run3 rps=25443.48 failed=0 non2xx=0 keepalive_req=0
+ver rev=9e6883a w=128 keep run1 rps=70110.49 failed=0 non2xx=0 keepalive_req=10000
+ver rev=9e6883a w=128 keep run2 rps=79669.21 failed=0 non2xx=0 keepalive_req=10000
+ver rev=9e6883a w=128 keep run3 rps=70071.19 failed=0 non2xx=0 keepalive_req=10000
+bypass rev=9e6883a w=8 nokeep run1 rps=18570.65 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=8 nokeep run2 rps=22950.41 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=8 nokeep run3 rps=20101.80 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=8 keep run1 rps=329.30 failed=47 non2xx=0 keepalive_req=9954
+bypass rev=9e6883a w=8 keep run2 rps=329.24 failed=47 non2xx=0 keepalive_req=9953
+bypass rev=9e6883a w=8 keep run3 rps=329.85 failed=48 non2xx=0 keepalive_req=9952
+bypass rev=9e6883a w=128 nokeep run1 rps=20997.68 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=128 nokeep run2 rps=19257.43 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=128 nokeep run3 rps=20029.08 failed=0 non2xx=0 keepalive_req=0
+bypass rev=9e6883a w=128 keep run1 rps=31348.45 failed=0 non2xx=0 keepalive_req=10000
+bypass rev=9e6883a w=128 keep run2 rps=28416.52 failed=0 non2xx=0 keepalive_req=10000
+bypass rev=9e6883a w=128 keep run3 rps=30261.40 failed=0 non2xx=0 keepalive_req=10000
+w8-keep log: lines=   80413
+  'timed out' = 48
+  '503' = 0
+  'queue full' = 0
+  'peer closed' = 51
+  '408' = 0
+  'keep-alive idle' = 0
+  'deadline' = 0
+# end 2026-11-26 10:40:36 KST
+
+## w8 keep-alive 실패 원인 확인 (HEAD 9e6883a, -w 8, ab -k -n 10000 -c 100, 서버 로그 보존 1회)
+ab: Failed requests 48 (Connect 0, Receive 0, Length 48, Exceptions 0), Time taken 30.165 s, Waiting 최대 30,162 ms
+서버 로그: 'timed out' 48줄, 503 0줄, 'queue full' 0줄. 실패 건수와 timed out 건수가 같다. 요청 하나하나의 1:1 대응은 확인하지 않았다.
+
+## 느린 client 1개가 있을 때 일반 GET 1건의 응답 시간 (각 브랜치 최신 커밋 빌드, -w 8, 서버 timeout 기본 5초)
+방법: 헤더를 끝내지 않은 연결 하나를 8초 동안 열어 두고 0.5초 뒤에 curl로 / 를 요청해 time_total을 쟀다. 모델마다 1회.
+stage6-sequential dd5b3a3: 4.523612 s
+stage6-per-connection d24fd3a: 0.003492 s
+stage6-thread-pool f4f68da: 0.002602 s

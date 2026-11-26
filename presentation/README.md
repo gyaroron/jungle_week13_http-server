@@ -1,14 +1,14 @@
 # C로 밑바닥부터 만든 웹서버 + 프록시
 
 > **POSIX 소켓 API만으로** 만든 HTTP/1.1 서버입니다. 정적 파일, CGI, **Forward Proxy와 Reverse Proxy(Round-Robin)**, 스레드 풀, GET 캐시를 구현했습니다.
-> 외부 HTTP·이벤트 라이브러리는 쓰지 않았습니다. `src/*.c` 14개 모듈, 약 3,100줄입니다.
+> 외부 HTTP·이벤트 라이브러리는 쓰지 않았습니다. `src/*.c` 14개 모듈, 약 3,300줄입니다(2026-11-26 HEAD `9e6883a` 기준).
 
 | 발표 순서 (4분) | 시간 | 보여줄 그림 |
 |---|---:|---|
 | 1. 무엇을 만들었나 | 0:00 – 0:30 | 요구사항 검수표 |
 | 2. 요청 한 건이 지나가는 길 | 0:30 – 1:20 | 전체 구조, 상태 머신 |
 | 3. Proxy 두 가지 | 1:20 – 2:00 | Forward vs Reverse |
-| 4. 동시성 모델과 C10K | 2:00 – 2:50 | 부하 테스트 |
+| 4. 연결 처리 방식과 C10K | 2:00 – 2:50 | 부하 테스트 |
 | 5. AI 코드 검증 — 버그 발견과 수정 | 2:50 – 3:40 | 검증 5단계 |
 | 6. 배운 점 · 다음 단계 | 3:40 – 4:00 | — |
 
@@ -18,10 +18,10 @@
 
 ![요구사항 검수표](images/02_requirements.svg)
 
-- 필수 항목 **16개 모두 통과**했습니다. 단, 기능 테스트는 처음엔 19/21이었습니다. 원인을 찾아 고친 뒤 22/22가 되었습니다(5장).
+- 필수 항목 **16개 모두 통과**했습니다. 단, 기능 테스트는 처음엔 19/21이었습니다. 원인을 찾아 고친 뒤 22/22가 되었고, 이후 느린 client 대응 검사 2건을 더해 현재 **24/24**입니다(5장).
 - "둘 중 하나 이상"인 조건은 하나만 맞아도 되지만 둘 다 구현했습니다.
   - Proxy: Forward와 Reverse를 **둘 다** 구현했습니다.
-  - 동시성: 스레드 풀, 연결별 스레드, 순차 처리를 각각 브랜치로 만들어 **세 모델을 비교**했습니다.
+  - 동시 처리: 스레드 풀(채택)과 연결별 스레드, 두 가지 **동시성 모델**을 만들고, 동시성이 없는 **순차 처리 기준선**과 브랜치별로 비교했습니다.
 
 ```sh
 make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
@@ -43,8 +43,9 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 **말할 포인트**
 1. `socket → bind → listen`. 소켓에 `SO_REUSEADDR`를 켜서, 재시작할 때 `TIME_WAIT` 때문에 `bind`가 실패하지 않게 했습니다.
 2. listen 소켓은 **non-blocking으로 두고 `poll(1초)`로 대기**합니다. 그래서 `Ctrl+C`(SIGINT/SIGTERM)를 받으면 1초 안에 루프를 빠져나와 worker를 join하고 정상 종료합니다.
-3. 연결 소켓은 다시 **blocking + `SO_RCVTIMEO`** 로 바꿨습니다. 그래서 느린 클라이언트가 worker를 영원히 붙잡지 못합니다(408).
-4. `SIGPIPE`는 무시합니다(+ macOS `SO_NOSIGPIPE`). 그래서 클라이언트가 응답 도중에 끊어도 서버가 죽지 않습니다.
+3. 연결 소켓은 다시 blocking으로 바꾸고(`src/main.c:157`), 요청 하나를 읽는 데 쓸 수 있는 시간을 **monotonic clock 기준 deadline**(`src/conn.c:45–66`)으로 제한합니다. `recv()` 전에 `net_wait(POLLIN)`으로 남은 시간만큼만 기다리므로, 헤더를 조금씩 흘려 보내는 연결도 deadline에 408로 끊깁니다. `SO_RCVTIMEO`/`SO_SNDTIMEO`(`src/net.c:91–98`)는 송신과 `recv()` 단위의 보조 제한으로 남아 있습니다.
+4. worker와 대기열(circular queue 128칸)이 모두 차면 `pool_submit()`이 기다리지 않고 `EAGAIN`을 돌려주고(`src/pool.c:107–`), `main`이 **503**을 보내 닫습니다(`src/main.c:192–196`). 종료할 때 아직 시작하지 않은 대기 연결도 503으로 돌려보냅니다(`src/main.c:206`).
+5. `SIGPIPE`는 무시합니다(+ macOS `SO_NOSIGPIPE`). 그래서 클라이언트가 응답 도중에 끊어도 서버가 죽지 않습니다.
 
 ![상태 머신](images/03_state_machine.svg)
 
@@ -75,22 +76,44 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 4. 동시성 모델과 C10K `2:00`
+## 4. 연결 처리 방식과 C10K `2:00`
 
 ![부하 테스트](images/05_benchmark.svg)
 
-| 모델 | 장점 | 단점 |
+**용어부터:** 순차 처리는 연결을 한 번에 하나만 처리하므로 **동시성 모델이 아닙니다.** 동시성이 없을 때의 **기준선**입니다. 비교 대상은 두 가지 동시성 모델(연결별 스레드, 스레드 풀)입니다.
+
+| 방식 | 장점 | 단점 |
 |---|---|---|
-| 순차 처리 | 단순하고 경쟁 상태가 없음 | 느린 요청 하나가 모두를 막음 |
-| 연결별 스레드 | 구현이 쉽고 측정 성능도 좋았음 | 연결 수만큼 스레드와 스택이 생김. 폭주하면 메모리 고갈 |
+| 순차 처리 (기준선, 동시성 없음) | 단순하고 경쟁 상태가 없음. 짧은 요청에서는 가장 빠름 | 느린 client 1개가 모든 연결을 막음 |
+| 연결별 스레드 | 구현이 쉬움. 느린 client가 다른 연결을 막지 않음 | 연결 수만큼 스레드와 스택이 생김. 폭주하면 메모리 고갈 |
 | **스레드 풀 (채택)** | 스레드 수가 고정되어 자원을 예측할 수 있음 | **keep-alive 연결이 worker를 점유함** |
 
-- 동시 keep-alive 연결이 100개인데 worker가 8개면 나머지 92개가 기다립니다. 회귀를 고친 뒤 다시 재도 328 rps, 실패 48건이었습니다. 캐시 버그가 아니라 구조의 한계입니다.
-- worker를 128개로 늘리면 23,364 rps, 실패 0건입니다(캐시 이전 기록은 15,105). 하지만 이는 스레드를 늘려 문제를 덮은 것입니다.
-- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` 이벤트 루프로 연결과 스레드를 분리하는 것입니다(다음 단계).
+**측정 ① 연결 처리 방식 3종** (`ab -n 2000 -c 50`, 각 브랜치 최신 커밋, 4회 중앙값, 169 bytes 정적 파일)
+- 순차 **25,428** · 연결별 스레드 **14,201** · 스레드 풀 **17,785** req/s입니다. 작고 빠른 요청에서는 스레드 생성·전환 비용 때문에 **순차가 가장 빠릅니다.** 그래서 이 숫자만으로 동시성의 가치를 말할 수 없습니다.
+- 동시성이 필요한 이유는 느린 client입니다. 헤더를 끝내지 않는 연결 1개를 열어 둔 상태에서 일반 `GET` 1건이 걸린 시간은 순차 **4.5초**(느린 연결이 서버 timeout 5초로 끊길 때까지 대기), 연결별 스레드 **0.003초**, 스레드 풀 **0.003초**였습니다(모델마다 1회).
 
-> 위 비교는 같은 Mac의 loopback에서 `-O0` 디버그 빌드로 측정했습니다. 일반적인 성능 보장이 아닙니다.
-> 원본 출력: [`docs/benchmarks/`](../docs/benchmarks/)
+**측정 ② keep-alive와 worker 수** (`ab -n 10000 -c 100`, HEAD, 3회 중앙값)
+- worker 8 + keep-alive는 **332 req/s, 실패 46~48건**입니다. 캐시를 끄고(`Cookie` 헤더로 우회) 재도 **329 req/s, 실패 47~48건**으로 같습니다. 캐시가 들어오기 전 코드(`56ef9f8`)와 수정 직후 코드(`eaa1fef`)에서도 326 · 328 req/s, 실패 47 · 48건이었습니다(각 1회).
+- 반대로 `78b04af`는 캐시가 연결을 매번 닫아 keep-alive 요청이 0건이었고, 같은 worker 8에서 15,638 req/s, 실패 0건이었습니다(1회). keep-alive를 켜자 오히려 느려지는 것은 **연결이 worker를 붙잡는 구조** 때문이라는 해석과 맞습니다.
+- 서버 로그의 `timed out` 48줄과 ab의 `Length` 실패 48건은 개수가 같습니다. 요청 하나하나가 1:1로 대응하는지는 확인하지 못했습니다. 따라서 "worker가 모자라 대기하던 연결이 deadline을 넘겨 끊겼다"는 설명은 **측정과 맞는 해석**이지 증명은 아닙니다.
+- worker 128로 늘리면 실패가 0건입니다. 하지만 스레드를 늘려 문제를 덮은 것입니다.
+
+**측정 ③ worker 128 · keep-alive 처리량이 오른 이유는 아직 나누지 못했습니다**
+
+| 코드 | req/s (3회 중앙값) | 의미 |
+|---|---:|---|
+| `56ef9f8` | 17,360 | 캐시 없음 |
+| `78b04af` | 15,852 | 캐시 있음, 연결 강제 종료(keep-alive 요청 0건) |
+| `eaa1fef` | 25,912 | keep-alive 수정 |
+| `9e6883a` (HEAD) | 70,110 | SPOF 수정 포함 |
+| HEAD, 캐시 끔 | 30,261 | 같은 코드에서 캐시만 우회 |
+
+- 25,912 → 70,110은 `9ded267`이 한 번에 바꾼 로그 thread, 캐시 전역 잠금 제거, deadline 방식을 따로 측정하지 못해 **어느 변경의 몫인지 말할 수 없습니다.** 캐시 HIT 자체는 HEAD에서 30,261 → 70,110(약 2.3배)입니다.
+- 이전 README의 "15,105 → 23,364 req/s"는 서로 다른 시점의 단회 측정이라 이 표로 대체했습니다.
+- **결론**: 연결 하나당 스레드 하나를 쓰는 구조는 C10K에서 한계가 있습니다. 해결책은 `epoll`/`kqueue` event loop로 연결과 스레드를 분리하는 것입니다(다음 단계, 아직 구현하지 않았습니다).
+
+> 모든 수치는 같은 Mac의 loopback에서 `-O0` debug build로 2026-11-26 한 세션에 측정했고, 실행마다 흔들립니다(예: 같은 조건 3회가 24,550~31,992). 어제(2026-11-25) 기록과 값이 다른 것도 이 때문입니다.
+> 원본 출력: [`docs/benchmarks/apachebench_2026-11-26_controlled.txt`](../docs/benchmarks/apachebench_2026-11-26_controlled.txt)
 
 ---
 
@@ -98,14 +121,14 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ![검증 5단계](images/06_verification.svg)
 
-| 단계 | 명령 | 결과 (2026-11-25 수정 후 재실행) |
+| 단계 | 명령 | 결과 (2026-11-26 HEAD `9e6883a` 재실행) |
 |---|---|---|
 | 단위 테스트 | `make test`, `make test-asan` | HTTP 파서 · MIME · 라우팅 **3/3 통과** |
-| 기능 테스트 | `./scripts/functional_test.sh` | **22/22 통과** (수정 전 19/21) |
+| 기능 테스트 | `./scripts/functional_test.sh` | **24/24 통과** (캐시 도입 직후 19/21) |
 | 메모리 오류 | `make asan` 후 기능 테스트 | AddressSanitizer + UBSan **오류 0** |
 | 데이터 경쟁 | `make tsan` 후 기능 테스트 | ThreadSanitizer **경고 0** |
 | 메모리 누수 | `leaks --atExit` | **0 bytes**. 단, 캐시 추가 전에 기록한 값입니다 |
-| 부하 | 서버 `-w 128` + `ab -k -n 10000 -c 100` | 23,364 rps, **실패 0** |
+| 부하 | 서버 `-w 128` + `ab -k -n 10000 -c 100` | 70,110 req/s(3회 중앙값), **실패 0** |
 
 **검증하다 발견한 버그 — 발견 → 원인 → 수정**
 
@@ -115,9 +138,17 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | 원인 | `cache.c`가 MISS·HIT 응답에 **항상** `Connection: close`를 붙였습니다. `conn.c`도 캐시를 거친 요청이면 연결을 강제로 닫았습니다. 그래서 정적 파일 keep-alive가 사실상 꺼져 있었습니다. |
 | 수정 | 길이가 정해진 응답(정적 파일, 캐시 HIT)은 클라이언트 요청대로 `keep-alive`를 유지합니다. 업스트림 EOF까지 중계하는 프록시 MISS만 `close`를 유지합니다. `conn.c`는 캐시가 실제로 보낸 값을 따릅니다. |
 | 테스트 | 같은 URL 두 번은 캐시 HIT가 정상 동작입니다. 그래서 RR 검사는 서로 다른 URL로 바꾸고, "같은 URL 재요청 = HIT" 검사를 새로 추가했습니다. |
-| 결과 | 22/22 통과, ASan/TSan 0. keep-alive 부하(worker 128)는 15,105 → 23,364 rps가 되었습니다. |
+| 결과 | 22/22 통과. worker 128 keep-alive는 15,852(`78b04af`) → 25,912 req/s(`eaa1fef`)가 되었습니다(4장 측정 ③). |
 
-> **포인트:** "AI가 짠 코드가 돌아간다"에서 멈추지 않았습니다. 기존 테스트를 계속 다시 돌렸기 때문에 새 기능이 옛 기능을 깨뜨린 것을 바로 잡을 수 있었습니다.
+**두 번째 수정 (`9ded267`) — 느린 client 하나가 서버를 세우는 문제**
+
+| | 내용 |
+|---|---|
+| 문제 | 느린 client 하나가 worker를 붙잡고, 막힌 로그 출력이 서버 전체를 멈추고, 캐시 전역 잠금이 읽기·쓰기를 서로 기다리게 할 수 있었습니다. |
+| 수정 | 요청별 monotonic deadline으로 408, queue가 가득 차면 `EAGAIN` → 503, 256 KiB log ring buffer와 전용 writer thread, 요청 전체를 감싸던 캐시 rwlock 제거(non-GET은 writer 표시와 generation으로 처리) |
+| 검사 | `functional_test.sh`에 "헤더를 조금씩 보내는 연결은 제한 시간 뒤 408"과 "느린 GET 다운로드 중에도 POST와 GET 즉시 처리"를 추가했습니다. 두 검사는 이전 코드에서 실패한다고 커밋에 기록했고, 이번 세션에서 이전 코드로 다시 확인하지는 않았습니다. |
+
+> **포인트:** "AI가 짠 코드가 돌아간다"에서 멈추지 않았습니다. 기존 테스트를 계속 다시 돌렸기 때문에 새 기능이 옛 기능을 깨뜨린 것을 바로 잡았고, 새 위험은 새 검사로 먼저 고정했습니다.
 
 **AI와 일한 방식**
 - 단계별 작업 지시서(`docs/mac_tutorial_package/`)로 범위를 정했습니다. 각 단계의 결과는 실제 터미널 출력과 함께 [`docs/TUTORIAL_LOG.md`](../docs/TUTORIAL_LOG.md)에 기록했습니다.
@@ -135,7 +166,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 **다음 단계**
 1. `kqueue`/`epoll` 이벤트 루프 버전을 만들어 keep-alive 부하 재측정
 2. Linux(Docker)에서 빌드하고 `valgrind` 검사
-3. 헤더가 8 KiB를 넘을 때 조용히 끊지 않고 431을 응답
+3. 헤더가 8 KiB 버퍼를 넘을 때 조용히 끊지 않고 431을 응답(현재는 로그만 남기고 연결을 닫음, `src/conn.c:141`)
 
 ---
 
@@ -149,7 +180,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | 상태 라인 + Content-Type/Length/Connection | ✅ | `src/response.c` `resp_format_head()` |
 | 정적 파일 · MIME · 403/404/500 | ✅ | `src/static.c` (realpath로 루트 이탈 차단), `src/mime.c` |
 | 동적 처리 (CGI 또는 백엔드 전달) | ✅ | `src/cgi.c` fork/execve/pipe, `src/proxy.c` |
-| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀, CGI는 `fork()` |
+| 동시 처리 (fork / pthread / I/O 멀티플렉싱 중 1개 이상) | ✅ | `src/pool.c` 스레드 풀(채택), 연결별 스레드 브랜치, CGI는 `fork()`. 순차 브랜치는 비교 기준선 |
 | Forward 또는 Reverse Proxy (1개 이상) | ✅ | 둘 다: `proxy_forward_cached()`, `proxy_reverse_cached()` + RR `route_pick()` |
 | 라우팅: 경로 또는 Host 기반 | ✅ | `src/route.c` `route_match()` (둘 다) |
 | CLI 인자 또는 설정 파일 | ✅ | `src/config.c` getopt, `routes.conf` |
@@ -157,10 +188,10 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | SIGINT/SIGTERM 안전 종료, SIGPIPE 무시 | ✅ | `src/main.c` sigaction + `pool_shutdown()` |
 | 금지 라이브러리 미사용 | ✅ | 표준 C, POSIX, pthread만 사용 |
 | 단위 테스트 | ✅ | `tests/test_http.c`, `test_mime.c`, `test_route.c` |
-| 기능 테스트 (curl, 동시 접속) | ✅ | 22/22. 캐시 keep-alive 회귀를 찾아 수정 (`src/cache.c`, `src/conn.c`, `src/static.c`) |
+| 기능 테스트 (curl, 동시 접속) | ✅ | 24/24. 캐시 keep-alive 회귀(`1c2c4bd`)와 느린 client 대응(`9ded267`) 반영 |
 | 부하 테스트 | ✅ | `ab`, [`docs/benchmarks/`](../docs/benchmarks/) |
 | 메모리 검사 (sanitizer 또는 valgrind) | ✅ | ASan+UBSan 오류 0, TSan 경고 0. leaks 0 bytes(캐시 추가 전) |
-| 엣지 케이스 | ✅ | 400/413/414/431/501/505, 502/504, 클라이언트 중도 종료 |
+| 엣지 케이스 | ✅ | 400/413/414/431/501/505, 502/504, 408(느린 헤더), 503(대기열 가득), 클라이언트 중도 종료 |
 | 이식성 고려 | △ | `#ifdef SO_NOSIGPIPE` 분기는 있음. Linux 빌드는 실행하지 않음 |
 
 </details>

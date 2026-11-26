@@ -55,7 +55,7 @@
   <path d="M100 228 L100 300 L608 300" class="er" marker-end="url(#r)"/>
   <path d="M280 228 L280 300" class="er"/>
   <path d="M460 228 L460 300" class="er"/>
-  <text x="112" y="262" class="el">peer 종료 · 타임아웃 408</text>
+  <text x="112" y="262" class="el">peer 종료 · deadline 초과 408</text>
   <text x="292" y="262" class="el">400 · 413 · 414 · 431 · 501 · 505</text>
   <text x="472" y="262" class="el">전송 실패 (EPIPE)</text>
 
