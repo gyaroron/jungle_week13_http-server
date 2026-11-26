@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="600" rx="14" fill="#fcfcfb"/>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2f855a"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a32e2e"/></marker>
+<marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker>
+<marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker>
+</defs>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">4. 모든 thread가 함께 쓰는 곳의 SPOF 두 곳</text>
+<text x="32" y="68" font-size="13" fill="#52514e">고치기 전 eaa1fef → 고친 뒤 9ded267 · 한 곳에서 줄 서던 것을 줄 서지 않게</text>
+
+<!-- ROW 1 LEFT: log before -->
+<rect x="32" y="88" width="440" height="236" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="52" y="114" font-size="15" font-weight="800" fill="#a32e2e">③ 로그 출력 · 전</text>
+<text x="52" y="134" font-size="11.5" fill="#52514e">모든 thread가 mutex 하나를 잡은 채 stderr에 직접 씀</text>
+<g fill="#2a78d6"><rect x="56" y="156" width="26" height="22" rx="4"/><rect x="56" y="186" width="26" height="22" rx="4"/><rect x="56" y="216" width="26" height="22" rx="4"/><rect x="56" y="246" width="26" height="22" rx="4"/></g>
+<g stroke="#a32e2e" stroke-width="1.8"><line x1="86" y1="167" x2="186" y2="205" marker-end="url(#r)"/><line x1="86" y1="197" x2="186" y2="209" marker-end="url(#r)"/><line x1="86" y1="227" x2="186" y2="215" marker-end="url(#r)"/><line x1="86" y1="257" x2="186" y2="219" marker-end="url(#r)"/></g>
+<rect x="192" y="190" width="84" height="44" rx="8" fill="#fbeaea" stroke="#a32e2e" stroke-width="1.6"/>
+<text x="234" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#a32e2e">mutex</text><text x="234" y="226" text-anchor="middle" font-size="11" fill="#a32e2e">+ write()</text>
+<line x1="276" y1="212" x2="318" y2="212" stroke="#52514e" stroke-width="1.6" marker-end="url(#k)"/>
+<rect x="324" y="190" width="120" height="44" rx="8" fill="#f3f2ef" stroke="#8a8984"/>
+<text x="384" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#3a3936">stderr</text><text x="384" y="226" text-anchor="middle" font-size="11" fill="#a32e2e">읽는 쪽이 막힘</text>
+<text x="52" y="296" font-size="12.5" font-weight="700" fill="#a32e2e">출력이 막히면 로그를 쓰려는 모든 thread가</text>
+<text x="52" y="314" font-size="12.5" font-weight="700" fill="#a32e2e">mutex 앞에서 함께 멈춘다</text>
+
+<!-- ROW 1 RIGHT: log after -->
+<rect x="488" y="88" width="440" height="236" rx="12" fill="#ffffff" stroke="#2f855a" stroke-width="1.4"/>
+<text x="508" y="114" font-size="15" font-weight="800" fill="#2f855a">③ 로그 출력 · 후</text>
+<text x="508" y="134" font-size="11.5" fill="#52514e">256 KiB ring buffer + 전용 log_writer thread (src/log.c:13, :39)</text>
+<g fill="#2a78d6"><rect x="512" y="156" width="26" height="22" rx="4"/><rect x="512" y="186" width="26" height="22" rx="4"/><rect x="512" y="216" width="26" height="22" rx="4"/><rect x="512" y="246" width="26" height="22" rx="4"/></g>
+<g stroke="#2f855a" stroke-width="1.8"><line x1="542" y1="167" x2="606" y2="203" marker-end="url(#g)"/><line x1="542" y1="197" x2="606" y2="208" marker-end="url(#g)"/><line x1="542" y1="227" x2="606" y2="216" marker-end="url(#g)"/><line x1="542" y1="257" x2="606" y2="221" marker-end="url(#g)"/></g>
+<circle cx="648" cy="212" r="36" fill="none" stroke="#2a78d6" stroke-width="12" stroke-dasharray="14,4"/>
+<text x="648" y="210" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1d4f91">ring</text><text x="648" y="223" text-anchor="middle" font-size="10" fill="#1d4f91">256 KiB</text>
+<line x1="690" y1="212" x2="716" y2="212" stroke="#52514e" stroke-width="1.6" marker-end="url(#k)"/>
+<rect x="720" y="194" width="84" height="36" rx="8" fill="#eaf2fc" stroke="#2a78d6"/><text x="762" y="216" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d4f91">log_writer</text>
+<line x1="804" y1="212" x2="830" y2="212" stroke="#52514e" stroke-width="1.6" marker-end="url(#k)"/>
+<rect x="834" y="194" width="76" height="36" rx="8" fill="#f3f2ef" stroke="#8a8984"/><text x="872" y="216" text-anchor="middle" font-size="11.5" font-weight="700" fill="#3a3936">stderr</text>
+<text x="648" y="268" text-anchor="middle" font-size="11" fill="#52514e">가득 차면 줄을 버리고 개수만 셈</text>
+<text x="508" y="296" font-size="12.5" font-weight="700" fill="#2f855a">thread는 버퍼에 넣고 바로 하던 일로 돌아간다</text>
+<text x="508" y="314" font-size="12.5" font-weight="700" fill="#2f855a">출력이 막혀도 기다리는 것은 log_writer 하나뿐</text>
+
+<!-- ROW 2 LEFT: cache before -->
+<rect x="32" y="340" width="440" height="228" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="52" y="366" font-size="15" font-weight="800" fill="#a32e2e">④ 캐시 잠금 · 전</text>
+<text x="52" y="386" font-size="11.5" fill="#52514e">요청 처리 전체를 pthread_rwlock 하나로 감쌈</text>
+<rect x="52" y="400" width="400" height="104" rx="10" fill="#fbeaea" stroke="#a32e2e" stroke-width="1.6" stroke-dasharray="6,4"/>
+<text x="64" y="418" font-size="11" font-weight="700" fill="#a32e2e">rwlock 1개 (요청 전체)</text>
+<circle cx="78" cy="444" r="10" fill="#fde7d9" stroke="#c2410c"/>
+<rect x="96" y="434" width="300" height="20" rx="4" fill="#f6c9ad"/><text x="104" y="448" font-size="11" fill="#7a2e0a">느린 GET 다운로드 (읽기 잠금 유지)</text>
+<g fill="#e6f4ec" stroke="#2f855a"><circle cx="74" cy="478" r="9"/><circle cx="98" cy="478" r="9"/><circle cx="122" cy="478" r="9"/></g>
+<line x1="134" y1="478" x2="154" y2="478" stroke="#a32e2e" stroke-width="1.6" marker-end="url(#r)"/>
+<rect x="158" y="467" width="48" height="22" rx="11" fill="#ffffff" stroke="#a32e2e" stroke-width="1.6"/><text x="182" y="482" text-anchor="middle" font-size="11" font-weight="800" fill="#a32e2e">POST</text>
+<line x1="206" y1="478" x2="240" y2="478" stroke="#a32e2e" stroke-width="1.8" marker-end="url(#r)"/><line x1="250" y1="466" x2="250" y2="490" stroke="#a32e2e" stroke-width="3"/>
+<text x="262" y="482" font-size="11" fill="#a32e2e">POST도, 그 뒤 GET도 줄 섬</text>
+<text x="52" y="530" font-size="12.5" font-weight="700" fill="#a32e2e">쓰기 잠금을 기다리는 POST 하나 뒤로</text>
+<text x="52" y="548" font-size="12.5" font-weight="700" fill="#a32e2e">느린 GET이 끝날 때까지 모든 요청이 멈춘다</text>
+
+<!-- ROW 2 RIGHT: cache after -->
+<rect x="488" y="340" width="440" height="228" rx="12" fill="#ffffff" stroke="#2f855a" stroke-width="1.4"/>
+<text x="508" y="366" font-size="15" font-weight="800" fill="#2f855a">④ 캐시 잠금 · 후</text>
+<text x="508" y="386" font-size="11.5" fill="#52514e">요청 전체 잠금 제거 · cache_writers + generation (src/cache.c:249, :401)</text>
+<circle cx="526" cy="420" r="10" fill="#fde7d9" stroke="#c2410c"/>
+<rect x="544" y="410" width="300" height="20" rx="4" fill="#f6c9ad"/><text x="552" y="424" font-size="11" fill="#7a2e0a">느린 GET 다운로드는 혼자 계속</text>
+<rect x="508" y="449" width="48" height="22" rx="11" fill="#ffffff" stroke="#2f855a" stroke-width="1.6"/><text x="532" y="464" text-anchor="middle" font-size="11" font-weight="800" fill="#2f855a">POST</text>
+<line x1="556" y1="460" x2="594" y2="460" stroke="#2f855a" stroke-width="1.8" marker-end="url(#g)"/>
+<rect x="598" y="446" width="170" height="28" rx="7" fill="#eaf2fc" stroke="#2a78d6"/><text x="683" y="465" text-anchor="middle" font-size="11" font-weight="700" fill="#1d4f91">writers 1 · generation +1</text>
+<g fill="#e6f4ec" stroke="#2f855a"><circle cx="526" cy="498" r="9"/><circle cx="550" cy="498" r="9"/><circle cx="574" cy="498" r="9"/></g>
+<path d="M586 498 C640 498, 660 506, 690 506" fill="none" stroke="#2f855a" stroke-width="1.8" marker-end="url(#g)"/>
+<text x="698" y="502" font-size="11" fill="#2f855a">캐시를 건너뛰고</text><text x="698" y="516" font-size="11" fill="#2f855a">원본에서 바로 응답</text>
+<text x="508" y="548" font-size="12.5" font-weight="700" fill="#2f855a">POST가 바꾸는 동안에도 GET은 기다리지 않는다</text>
+</svg>

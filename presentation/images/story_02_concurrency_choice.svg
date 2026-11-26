@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="600" rx="14" fill="#fcfcfb"/>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2f855a"/></marker>
+<marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a32e2e"/></marker>
+</defs>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">2. 같은 장면, 세 가지 모델</text>
+<text x="32" y="68" font-size="13" fill="#52514e">느린 client 1개가 붙어 있을 때 새 GET 1개가 들어온다 · 모델마다 1회 측정</text>
+
+<!-- legend -->
+<circle cx="640" cy="40" r="8" fill="#fde7d9" stroke="#c2410c"/><text x="654" y="44" font-size="12" fill="#3a3936">느린 client</text>
+<circle cx="746" cy="40" r="8" fill="#e6f4ec" stroke="#2f855a"/><text x="760" y="44" font-size="12" fill="#3a3936">새 GET</text>
+<rect x="822" y="32" width="16" height="16" rx="3" fill="#2a78d6"/><text x="844" y="44" font-size="12" fill="#3a3936">thread</text>
+
+<!-- panel 1: sequential -->
+<rect x="32" y="92" width="288" height="400" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="52" y="122" font-size="16" font-weight="800" fill="#0b0b0b">순차 처리</text>
+<text x="52" y="142" font-size="11.5" fill="#52514e">기준선 · thread 1개</text>
+<rect x="176" y="176" width="124" height="190" rx="10" fill="#f3f2ef" stroke="#8a8984"/>
+<text x="238" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#3a3936">server</text>
+<rect x="196" y="214" width="84" height="30" rx="5" fill="#f6c9ad" stroke="#c2410c"/><text x="238" y="234" text-anchor="middle" font-size="11.5" fill="#7a2e0a">사용 중</text>
+<circle cx="64" cy="229" r="14" fill="#fde7d9" stroke="#c2410c"/>
+<line x1="80" y1="229" x2="192" y2="229" stroke="#c2410c" stroke-width="2" stroke-dasharray="6,6" marker-end="url(#o)"/>
+<circle cx="64" cy="300" r="12" fill="#e6f4ec" stroke="#2f855a"/>
+<line x1="78" y1="300" x2="150" y2="300" stroke="#a32e2e" stroke-width="2" marker-end="url(#r)"/>
+<line x1="164" y1="282" x2="164" y2="318" stroke="#a32e2e" stroke-width="3"/>
+<text x="64" y="336" font-size="12" fill="#a32e2e">문 앞에서 대기</text>
+<text x="52" y="404" font-size="26" font-weight="800" fill="#a32e2e">4.5초</text>
+<text x="52" y="428" font-size="12" fill="#52514e">느린 연결이 timeout으로 끊길 때까지</text>
+<rect x="52" y="446" width="248" height="30" rx="8" fill="#fbeaea"/><text x="176" y="466" text-anchor="middle" font-size="13" font-weight="700" fill="#a32e2e">✕ 요구사항 ① 실패</text>
+
+<!-- panel 2: per connection -->
+<rect x="336" y="92" width="288" height="400" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="356" y="122" font-size="16" font-weight="800" fill="#0b0b0b">연결별 thread</text>
+<text x="356" y="142" font-size="11.5" fill="#52514e">연결 1개 = thread 1개</text>
+<rect x="480" y="176" width="124" height="190" rx="10" fill="#f3f2ef" stroke="#8a8984"/>
+<text x="542" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#3a3936">server</text>
+<rect x="500" y="214" width="84" height="30" rx="5" fill="#f6c9ad" stroke="#c2410c"/><text x="542" y="234" text-anchor="middle" font-size="11.5" fill="#7a2e0a">사용 중</text>
+<rect x="500" y="254" width="84" height="30" rx="5" fill="#2a78d6"/><text x="542" y="274" text-anchor="middle" font-size="11.5" fill="#ffffff">새 thread</text>
+<g fill="#2a78d6" opacity=".45"><rect x="500" y="294" width="84" height="14" rx="3"/><rect x="500" y="312" width="84" height="14" rx="3"/><rect x="500" y="330" width="84" height="14" rx="3"/></g>
+<text x="542" y="360" text-anchor="middle" font-size="11" fill="#a32e2e">연결 수만큼 계속 늘어남</text>
+<circle cx="368" cy="229" r="14" fill="#fde7d9" stroke="#c2410c"/>
+<line x1="384" y1="229" x2="496" y2="229" stroke="#c2410c" stroke-width="2" stroke-dasharray="6,6" marker-end="url(#o)"/>
+<circle cx="368" cy="269" r="12" fill="#e6f4ec" stroke="#2f855a"/>
+<line x1="382" y1="269" x2="496" y2="269" stroke="#2f855a" stroke-width="2" marker-end="url(#g)"/>
+<text x="356" y="404" font-size="26" font-weight="800" fill="#2f855a">0.003초</text>
+<text x="356" y="428" font-size="12" fill="#52514e">새 GET은 바로 처리</text>
+<rect x="356" y="446" width="248" height="30" rx="8" fill="#fdf3dc"/><text x="480" y="466" text-anchor="middle" font-size="13" font-weight="700" fill="#8a5a00">△ ① 통과 · ② 상한 없음</text>
+
+<!-- panel 3: thread pool -->
+<rect x="640" y="92" width="288" height="400" rx="12" fill="#eaf2fc" stroke="#2a78d6" stroke-width="1.6"/>
+<text x="660" y="122" font-size="16" font-weight="800" fill="#1d4f91">thread pool</text>
+<text x="660" y="142" font-size="11.5" fill="#52514e">worker 8 · queue 128 (고정)</text>
+<rect x="784" y="176" width="124" height="190" rx="10" fill="#ffffff" stroke="#2a78d6"/>
+<text x="846" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4f91">worker 8</text>
+<rect x="800" y="214" width="20" height="22" rx="4" fill="#f6c9ad" stroke="#c2410c"/>
+<g fill="#2a78d6"><rect x="826" y="214" width="20" height="22" rx="4"/><rect x="852" y="214" width="20" height="22" rx="4"/><rect x="878" y="214" width="20" height="22" rx="4"/>
+<rect x="826" y="242" width="20" height="22" rx="4"/><rect x="852" y="242" width="20" height="22" rx="4"/><rect x="878" y="242" width="20" height="22" rx="4"/></g>
+<rect x="800" y="242" width="20" height="22" rx="4" fill="#2a78d6" stroke="#2f855a" stroke-width="2.4"/>
+<rect x="800" y="286" width="100" height="56" rx="6" fill="#f3f2ef" stroke="#8a8984" stroke-dasharray="4,3"/>
+<text x="850" y="310" text-anchor="middle" font-size="11" fill="#52514e">queue 128</text>
+<text x="850" y="328" text-anchor="middle" font-size="11" fill="#52514e">넘치면 503</text>
+<circle cx="672" cy="225" r="14" fill="#fde7d9" stroke="#c2410c"/>
+<line x1="688" y1="225" x2="796" y2="225" stroke="#c2410c" stroke-width="2" stroke-dasharray="6,6" marker-end="url(#o)"/>
+<circle cx="672" cy="253" r="12" fill="#e6f4ec" stroke="#2f855a"/>
+<line x1="686" y1="253" x2="796" y2="253" stroke="#2f855a" stroke-width="2" marker-end="url(#g)"/>
+<text x="660" y="404" font-size="26" font-weight="800" fill="#2f855a">0.003초</text>
+<text x="660" y="428" font-size="12" fill="#52514e">남은 worker 7개가 바로 처리</text>
+<rect x="660" y="446" width="248" height="30" rx="8" fill="#e6f4ec"/><text x="784" y="466" text-anchor="middle" font-size="13" font-weight="700" fill="#2f855a">✓ ①, ② 통과 → 채택</text>
+
+<rect x="32" y="512" width="896" height="56" rx="10" fill="#fdf3dc" stroke="#c98500"/>
+<text x="52" y="536" font-size="13.5" font-weight="700" fill="#5c3d00">짧은 요청만 보면 순차가 가장 빠르다 (25,428 · 14,201 · 17,785 req/s)</text>
+<text x="52" y="556" font-size="12.5" fill="#3a3936">그래서 처리량이 아니라 1장의 요구사항으로 골랐다 · 남은 숙제: 고른 thread pool 안의 SPOF</text>
+</svg>

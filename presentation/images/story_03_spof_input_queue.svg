@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
+<rect width="960" height="600" rx="14" fill="#fcfcfb"/>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2f855a"/></marker>
+<marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a32e2e"/></marker>
+<marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker>
+</defs>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">3. thread pool 앞단의 SPOF 두 곳</text>
+<text x="32" y="68" font-size="13" fill="#52514e">고치기 전 eaa1fef → 고친 뒤 9ded267 · 같은 장면을 전과 후로 비교</text>
+
+<!-- ROW 1 LEFT: SPOF 1 before -->
+<rect x="32" y="88" width="440" height="236" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="52" y="114" font-size="15" font-weight="800" fill="#a32e2e">① 느린 client · 전</text>
+<text x="52" y="134" font-size="11.5" fill="#52514e">1바이트가 올 때마다 5초 제한이 처음부터 다시 시작</text>
+<rect x="260" y="150" width="190" height="120" rx="10" fill="#f3f2ef" stroke="#8a8984"/>
+<text x="355" y="168" text-anchor="middle" font-size="12" font-weight="700" fill="#3a3936">worker 8</text>
+<g fill="#f6c9ad" stroke="#c2410c">
+<rect x="278" y="180" width="30" height="24" rx="4"/><rect x="316" y="180" width="30" height="24" rx="4"/><rect x="354" y="180" width="30" height="24" rx="4"/><rect x="392" y="180" width="30" height="24" rx="4"/>
+<rect x="278" y="212" width="30" height="24" rx="4"/><rect x="316" y="212" width="30" height="24" rx="4"/><rect x="354" y="212" width="30" height="24" rx="4"/><rect x="392" y="212" width="30" height="24" rx="4"/></g>
+<g fill="#fde7d9" stroke="#c2410c"><circle cx="70" cy="164" r="11"/><circle cx="70" cy="192" r="11"/><circle cx="70" cy="220" r="11"/></g>
+<text x="98" y="244" font-size="11" fill="#c2410c">× 8개</text>
+<g stroke="#c2410c" stroke-width="1.8" stroke-dasharray="5,5"><line x1="84" y1="164" x2="270" y2="190" marker-end="url(#o)"/><line x1="84" y1="192" x2="270" y2="200" marker-end="url(#o)"/><line x1="84" y1="220" x2="270" y2="222" marker-end="url(#o)"/></g>
+<circle cx="70" cy="268" r="11" fill="#e6f4ec" stroke="#2f855a"/>
+<line x1="84" y1="268" x2="232" y2="268" stroke="#a32e2e" stroke-width="2" marker-end="url(#r)"/>
+<line x1="244" y1="254" x2="244" y2="282" stroke="#a32e2e" stroke-width="3"/>
+<text x="52" y="306" font-size="12.5" font-weight="700" fill="#a32e2e">worker 8개가 모두 붙잡히면 새 GET은 들어갈 자리가 없다</text>
+
+<!-- ROW 1 RIGHT: SPOF 1 after -->
+<rect x="488" y="88" width="440" height="236" rx="12" fill="#ffffff" stroke="#2f855a" stroke-width="1.4"/>
+<text x="508" y="114" font-size="15" font-weight="800" fill="#2f855a">① 느린 client · 후</text>
+<text x="508" y="134" font-size="11.5" fill="#52514e">요청마다 monotonic clock deadline 하나 (src/conn.c:61)</text>
+<rect x="716" y="150" width="190" height="120" rx="10" fill="#ffffff" stroke="#2a78d6"/>
+<text x="811" y="168" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4f91">worker 8</text>
+<g fill="#2a78d6">
+<rect x="734" y="180" width="30" height="24" rx="4"/><rect x="772" y="180" width="30" height="24" rx="4"/><rect x="810" y="180" width="30" height="24" rx="4"/><rect x="848" y="180" width="30" height="24" rx="4"/>
+<rect x="772" y="212" width="30" height="24" rx="4"/><rect x="810" y="212" width="30" height="24" rx="4"/><rect x="848" y="212" width="30" height="24" rx="4"/></g>
+<rect x="734" y="212" width="30" height="24" rx="4" fill="#2a78d6" stroke="#2f855a" stroke-width="2.4"/>
+<g fill="#fde7d9" stroke="#c2410c"><circle cx="526" cy="164" r="11"/><circle cx="526" cy="192" r="11"/><circle cx="526" cy="220" r="11"/></g>
+<g stroke="#c2410c" stroke-width="1.8" stroke-dasharray="5,5"><line x1="540" y1="164" x2="590" y2="164"/><line x1="540" y1="192" x2="590" y2="192"/><line x1="540" y1="220" x2="590" y2="220"/></g>
+<g fill="#e6f4ec" stroke="#2f855a"><rect x="596" y="154" width="44" height="20" rx="5"/><rect x="596" y="182" width="44" height="20" rx="5"/><rect x="596" y="210" width="44" height="20" rx="5"/></g>
+<g font-size="12" font-weight="800" fill="#2f855a" text-anchor="middle"><text x="618" y="169">408</text><text x="618" y="197">408</text><text x="618" y="225">408</text></g>
+<circle cx="526" cy="262" r="11" fill="#e6f4ec" stroke="#2f855a"/>
+<path d="M540 262 C640 262, 690 240, 728 228" fill="none" stroke="#2f855a" stroke-width="2" marker-end="url(#g)"/>
+<text x="508" y="306" font-size="12.5" font-weight="700" fill="#2f855a">시간이 다 되면 408로 끊고 worker를 돌려받는다</text>
+
+<!-- ROW 2 LEFT: SPOF 2 before -->
+<rect x="32" y="340" width="440" height="228" rx="12" fill="#ffffff" stroke="#c9c8c2"/>
+<text x="52" y="366" font-size="15" font-weight="800" fill="#a32e2e">② 대기열 가득 · 전</text>
+<text x="52" y="386" font-size="11.5" fill="#52514e">queue가 차면 accept가 빈칸이 날 때까지 기다림</text>
+<g fill="#e6f4ec" stroke="#2f855a"><circle cx="64" cy="424" r="11"/><circle cx="64" cy="452" r="11"/><circle cx="64" cy="480" r="11"/></g>
+<g stroke="#8a8984" stroke-width="1.4"><line x1="78" y1="424" x2="116" y2="446" marker-end="url(#k)"/><line x1="78" y1="452" x2="116" y2="452" marker-end="url(#k)"/><line x1="78" y1="480" x2="116" y2="458" marker-end="url(#k)"/></g>
+<rect x="122" y="430" width="92" height="44" rx="8" fill="#fbeaea" stroke="#a32e2e" stroke-width="1.6"/>
+<text x="168" y="457" text-anchor="middle" font-size="13" font-weight="700" fill="#a32e2e">accept</text>
+<rect x="138" y="404" width="60" height="20" rx="10" fill="#a32e2e"/><text x="168" y="418" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">멈춤</text>
+<line x1="214" y1="452" x2="246" y2="452" stroke="#52514e" stroke-width="1.6" marker-end="url(#k)"/>
+<rect x="252" y="430" width="200" height="44" rx="8" fill="#fbeaea" stroke="#a32e2e"/>
+<g fill="#a32e2e"><rect x="262" y="440" width="14" height="24" rx="3"/><rect x="281" y="440" width="14" height="24" rx="3"/><rect x="300" y="440" width="14" height="24" rx="3"/><rect x="319" y="440" width="14" height="24" rx="3"/><rect x="338" y="440" width="14" height="24" rx="3"/><rect x="357" y="440" width="14" height="24" rx="3"/><rect x="376" y="440" width="14" height="24" rx="3"/><rect x="395" y="440" width="14" height="24" rx="3"/><rect x="414" y="440" width="14" height="24" rx="3"/><rect x="433" y="440" width="12" height="24" rx="3"/></g>
+<text x="352" y="492" text-anchor="middle" font-size="11.5" fill="#a32e2e">queue 128칸 가득</text>
+<text x="52" y="526" font-size="12.5" font-weight="700" fill="#a32e2e">accept가 멈추면 새 연결도 줄 서고</text>
+<text x="52" y="546" font-size="12.5" font-weight="700" fill="#a32e2e">종료 신호(Ctrl+C) 확인도 함께 멈춘다</text>
+
+<!-- ROW 2 RIGHT: SPOF 2 after -->
+<rect x="488" y="340" width="440" height="228" rx="12" fill="#ffffff" stroke="#2f855a" stroke-width="1.4"/>
+<text x="508" y="366" font-size="15" font-weight="800" fill="#2f855a">② 대기열 가득 · 후</text>
+<text x="508" y="386" font-size="11.5" fill="#52514e">기다리지 않고 EAGAIN → 503 (src/pool.c:123 · src/main.c:191)</text>
+<circle cx="520" cy="452" r="11" fill="#e6f4ec" stroke="#2f855a"/>
+<line x1="534" y1="452" x2="572" y2="452" stroke="#8a8984" stroke-width="1.4" marker-end="url(#k)"/>
+<rect x="578" y="430" width="92" height="44" rx="8" fill="#f3f2ef" stroke="#8a8984"/>
+<text x="624" y="457" text-anchor="middle" font-size="13" font-weight="700" fill="#3a3936">accept</text>
+<path d="M604 430 C604 404, 646 404, 646 426" fill="none" stroke="#2f855a" stroke-width="1.8" marker-end="url(#g)"/>
+<text x="656" y="410" font-size="11" fill="#2f855a">바로 다음 accept</text>
+<line x1="670" y1="452" x2="702" y2="452" stroke="#52514e" stroke-width="1.6" marker-end="url(#k)"/>
+<rect x="708" y="430" width="200" height="44" rx="8" fill="#f3f2ef" stroke="#8a8984"/>
+<g fill="#8a8984"><rect x="718" y="440" width="14" height="24" rx="3"/><rect x="737" y="440" width="14" height="24" rx="3"/><rect x="756" y="440" width="14" height="24" rx="3"/><rect x="775" y="440" width="14" height="24" rx="3"/><rect x="794" y="440" width="14" height="24" rx="3"/><rect x="813" y="440" width="14" height="24" rx="3"/><rect x="832" y="440" width="14" height="24" rx="3"/><rect x="851" y="440" width="14" height="24" rx="3"/><rect x="870" y="440" width="14" height="24" rx="3"/><rect x="889" y="440" width="12" height="24" rx="3"/></g>
+<text x="808" y="492" text-anchor="middle" font-size="11.5" fill="#52514e">queue 128칸 가득</text>
+<path d="M600 474 C600 500, 540 500, 528 466" fill="none" stroke="#2f855a" stroke-width="2" marker-end="url(#g)"/>
+<rect x="540" y="494" width="52" height="24" rx="6" fill="#e6f4ec" stroke="#2f855a"/><text x="566" y="511" text-anchor="middle" font-size="14" font-weight="800" fill="#2f855a">503</text>
+<text x="508" y="546" font-size="12.5" font-weight="700" fill="#2f855a">못 받는 연결은 503으로 바로 돌려보내고 accept는 계속 돈다</text>
+</svg>
