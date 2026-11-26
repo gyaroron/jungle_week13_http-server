@@ -40,7 +40,7 @@
 
   <!-- keep-alive loop -->
   <path d="M850 120 C850 84, 100 84, 100 116" class="ln" marker-end="url(#a)"/>
-  <rect x="330" y="76" width="300" height="22" rx="11" fill="#fcfcfb"/>
+  <rect x="270" y="76" width="420" height="22" rx="11" fill="#fcfcfb"/>
   <text x="480" y="92" text-anchor="middle" class="s">keep-alive: 처리한 요청만 버퍼에서 memmove 후 다시 읽기</text>
 
   <!-- closing -->

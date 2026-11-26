@@ -1,20 +1,20 @@
 # C로 밑바닥부터 만든 웹서버 + 프록시
 
 > **POSIX 소켓 API만으로** 만든 HTTP/1.1 서버입니다. 정적 파일, CGI, **Forward Proxy와 Reverse Proxy(Round-Robin)**, 스레드 풀, GET 캐시를 구현했습니다.
-> 외부 HTTP·이벤트 라이브러리는 쓰지 않았습니다. `src/*.c` 14개 모듈, 약 3,300줄입니다(2026-11-26 HEAD `9e6883a` 기준).
+> 외부 HTTP·이벤트 라이브러리는 쓰지 않았습니다. `src/*.c` 15개 파일, 약 3,900줄입니다(2026-11-26 `main` 기준).
 
-| 발표 순서 (4분) | 시간 | 보여줄 그림 |
-|---|---:|---|
-| 1. 무엇을 만들었나 | 0:00 – 0:30 | 요구사항 검수표 |
-| 2. 요청 한 건이 지나가는 길 | 0:30 – 1:20 | 전체 구조, 상태 머신 |
-| 3. Proxy 두 가지 | 1:20 – 2:00 | Forward vs Reverse |
-| 4. 연결 처리 방식과 C10K | 2:00 – 2:50 | 부하 테스트 |
-| 5. AI 코드 검증 — 버그 발견과 수정 | 2:50 – 3:40 | 검증 5단계 |
-| 6. 배운 점 · 다음 단계 | 3:40 – 4:00 | — |
+| 목차 | 내용 |
+|---|---|
+| 1. 무엇을 만들었나 | 요구사항 검수표 |
+| 2. 요청 한 건이 지나가는 길 | 전체 구조, 상태 머신 |
+| 3. Proxy 두 가지 | Forward vs Reverse |
+| 4. 연결 처리 방식과 C10K | 부하 테스트, event loop |
+| 5. AI가 쓴 코드를 어떻게 믿었나 | 검증 5단계, 버그 발견과 수정 |
+| 6. 배운 점 · 다음 단계 | — |
 
 ---
 
-## 1. 무엇을 만들었나 `0:00`
+## 1. 무엇을 만들었나
 
 ![요구사항 검수표](images/02_requirements.svg)
 
@@ -36,11 +36,11 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 2. 요청 한 건이 지나가는 길 `0:30`
+## 2. 요청 한 건이 지나가는 길
 
 ![전체 구조](images/01_architecture.svg)
 
-**말할 포인트**
+**핵심 동작**
 1. `socket → bind → listen`. 소켓에 `SO_REUSEADDR`를 켜서, 재시작할 때 `TIME_WAIT` 때문에 `bind`가 실패하지 않게 했습니다.
 2. listen 소켓은 **non-blocking으로 두고 `poll(1초)`로 대기**합니다. 그래서 `Ctrl+C`(SIGINT/SIGTERM)를 받으면 1초 안에 루프를 빠져나와 worker를 join하고 정상 종료합니다.
 3. 연결 소켓은 다시 blocking으로 바꾸고(`src/main.c:157`), 요청 하나를 읽는 데 쓸 수 있는 시간을 **monotonic clock 기준 deadline**(`src/conn.c:45–66`)으로 제한합니다. `recv()` 전에 `net_wait(POLLIN)`으로 남은 시간만큼만 기다리므로, 헤더를 조금씩 흘려 보내는 연결도 deadline에 408로 끊깁니다. `SO_RCVTIMEO`/`SO_SNDTIMEO`(`src/net.c:91–98`)는 송신과 `recv()` 단위의 보조 제한으로 남아 있습니다.
@@ -57,7 +57,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 3. Proxy 두 가지 `1:20`
+## 3. Proxy 두 가지
 
 ![Forward vs Reverse](images/04_proxy.svg)
 
@@ -76,7 +76,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 4. 연결 처리 방식과 C10K `2:00`
+## 4. 연결 처리 방식과 C10K
 
 ![부하 테스트](images/05_benchmark.svg)
 
@@ -149,13 +149,13 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 5. AI가 쓴 코드를 어떻게 믿었나 `2:50`
+## 5. AI가 쓴 코드를 어떻게 믿었나
 
 ![검증 5단계](images/06_verification.svg)
 
-| 단계 | 명령 | 결과 (2026-11-26 HEAD `9e6883a` 재실행) |
+| 단계 | 명령 | 결과 (2026-11-26 로컬 재실행) |
 |---|---|---|
-| 단위 테스트 | `make test`, `make test-asan` | HTTP 파서 · MIME · 라우팅 **3/3 통과** |
+| 단위 테스트 | `make test`, `make test-asan` | HTTP 파서 · MIME · 라우팅 · event 모드 conn **4/4 통과** |
 | 기능 테스트 | `./scripts/functional_test.sh` | **24/24 통과** (캐시 도입 직후 19/21) |
 | 메모리 오류 | `make asan` 후 기능 테스트 | AddressSanitizer + UBSan **오류 0** |
 | 데이터 경쟁 | `make tsan` 후 기능 테스트 | ThreadSanitizer **경고 0** |
@@ -188,7 +188,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 6. 배운 점 · 다음 단계 `3:40`
+## 6. 배운 점 · 다음 단계
 
 **배운 점**
 - TCP는 "메시지"가 아니라 **바이트 스트림**입니다. HTTP 경계는 `\r\n\r\n`과 `Content-Length`로 직접 찾아야 합니다.
@@ -219,7 +219,7 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 | Makefile | ✅ | `all / test / asan / tsan / test-asan` |
 | SIGINT/SIGTERM 안전 종료, SIGPIPE 무시 | ✅ | `src/main.c` sigaction + `pool_shutdown()` |
 | 금지 라이브러리 미사용 | ✅ | 표준 C, POSIX, pthread만 사용 |
-| 단위 테스트 | ✅ | `tests/test_http.c`, `test_mime.c`, `test_route.c` |
+| 단위 테스트 | ✅ | `tests/test_http.c`, `test_mime.c`, `test_route.c`, `test_conn_event.c` |
 | 기능 테스트 (curl, 동시 접속) | ✅ | 24/24. 캐시 keep-alive 회귀(`1c2c4bd`)와 느린 client 대응(`9ded267`) 반영 |
 | 부하 테스트 | ✅ | `ab`, [`docs/benchmarks/`](../docs/benchmarks/) |
 | 메모리 검사 (sanitizer 또는 valgrind) | ✅ | ASan+UBSan 오류 0, TSan 경고 0. leaks 0 bytes(캐시 추가 전) |

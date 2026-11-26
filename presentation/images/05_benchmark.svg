@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 650" width="960" height="650" font-family="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif">
 <rect width="960" height="650" rx="14" fill="#fcfcfb"/>
 <text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">부하 테스트 (ApacheBench · 같은 Mac loopback · -O0 debug build)</text>
-<text x="32" y="68" font-size="13" fill="#52514e">2026-11-26 한 세션에서 모든 버전을 같은 명령으로 재측정 · 초당 요청 수(req/s), 높을수록 좋음 · 원문 docs/benchmarks/apachebench_2026-11-26_controlled.txt</text>
+<text x="32" y="68" font-size="13" fill="#52514e">2026-11-26 같은 세션 · 같은 명령으로 재측정 · 초당 요청 수(req/s), 높을수록 좋음</text>
 <text x="32" y="108" font-size="15" font-weight="700" fill="#0b0b0b">① 연결 처리 방식 3종 (순차는 동시성 없는 기준선)</text>
 <text x="32" y="128" font-size="12" fill="#52514e">ab -n 2000 -c 50 · 각 브랜치 최신 커밋 · 4회 중앙값 · 169 bytes 정적 파일</text>
 <line x1="202.0" y1="144" x2="202.0" y2="276" stroke="#e4e3de"/>
@@ -26,7 +26,7 @@
 <text x="310.8" y="259" font-size="13" font-weight="700" fill="#0b0b0b">17,785</text>
 <rect x="32" y="312" width="420" height="104" rx="10" fill="#fdf3dc" stroke="#c98500"/>
 <text x="48" y="336" font-size="13" font-weight="700" fill="#5c3d00">작고 빠른 요청에서는 순차가 가장 빠릅니다</text>
-<text x="48" y="356" font-size="12" fill="#3a3936">thread 생성과 전환 비용이 없기 때문입니다. 그러나 느린 client 1개가 있으면 달라집니다.</text>
+<text x="48" y="356" font-size="12" fill="#3a3936">thread 생성 · 전환 비용이 없어서입니다. 느린 client가 있으면 달라집니다.</text>
 <text x="48" y="378" font-size="12.5" font-weight="700" fill="#0b0b0b">일반 GET 1건 대기: 순차 4.5초 · 연결별 0.003초 · pool 0.003초</text>
 <text x="48" y="398" font-size="11" fill="#52514e">헤더를 끝내지 않는 연결 1개를 열어 둔 상태, 모델마다 1회 측정</text>
 <text x="500" y="108" font-size="15" font-weight="700" fill="#0b0b0b">② worker 128 · keep-alive, 코드 버전별</text>
@@ -64,5 +64,5 @@
 <text x="48" y="500" font-size="12.5" font-weight="400" fill="#0b0b0b">• 서버 로그의 timed out 48줄과 ab의 Length 실패 48건의 개수가 같습니다. 요청 하나하나의 1:1 대응은 확인하지 못했습니다.</text>
 <text x="48" y="526" font-size="12.5" font-weight="400" fill="#0b0b0b">• 반대로 78b04af는 캐시가 연결을 매번 닫아 keep-alive 요청이 0건이었고, 같은 w8에서 15,638 req/s · 실패 0건이었습니다 (1회).</text>
 <text x="48" y="552" font-size="13.5" font-weight="700" fill="#0b0b0b">→ keep-alive 연결이 worker를 붙잡는 구조가 원인이라는 해석이 측정과 맞습니다. worker 128로 늘리면 실패 0건이지만 문제를 덮은 것입니다.</text>
-<text x="48" y="598" font-size="12.5" fill="#0b0b0b">한계: 두 번의 상승은 원인을 나누지 못했습니다. 17,360 → 25,912는 keep-alive 수정, 25,912 → 70,110은 SPOF 수정 묶음(로그 thread · 캐시 전역 잠금 제거)입니다.</text><text x="48" y="618" font-size="12.5" fill="#0b0b0b">캐시 HIT 자체의 효과는 HEAD에서 30,261 → 70,110 (약 2.3배)입니다. 모든 값은 이 Mac의 loopback 측정이며 실행마다 흔들립니다.</text>
+<text x="48" y="598" font-size="12.5" fill="#0b0b0b">한계: 17,360 → 25,912는 keep-alive 수정, 25,912 → 70,110은 SPOF 수정 묶음입니다. 두 상승의 원인은 나누지 못했습니다.</text><text x="48" y="618" font-size="12.5" fill="#0b0b0b">캐시 HIT 자체의 효과는 HEAD에서 30,261 → 70,110 (약 2.3배)입니다. 모든 값은 이 Mac의 loopback 측정이며 실행마다 흔들립니다.</text>
 </svg>

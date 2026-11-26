@@ -82,7 +82,7 @@
   <text x="591" y="362" text-anchor="middle" class="t">CGI (동적)</text>
   <text x="591" y="383" text-anchor="middle" class="c">fork + execve + pipe</text>
   <text x="591" y="403" text-anchor="middle" class="s">POST 본문 → stdin</text>
-  <text x="591" y="421" text-anchor="middle" class="s">QUERY_STRING · CONTENT_LENGTH 환경변수</text>
+  <text x="591" y="421" text-anchor="middle" class="s">QUERY_STRING 환경변수</text>
   <text x="591" y="439" text-anchor="middle" class="s">타임아웃 504 · 실패 500</text>
 
   <rect x="720" y="334" width="208" height="122" rx="10" class="out"/>
