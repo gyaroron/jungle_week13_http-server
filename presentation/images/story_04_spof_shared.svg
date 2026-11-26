@@ -6,7 +6,7 @@
 <marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker>
 <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker>
 </defs>
-<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">4. 모든 thread가 함께 쓰는 곳의 SPOF 두 곳</text>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">4. 모두가 함께 쓰는 곳의 SPOF 두 곳</text>
 <text x="32" y="68" font-size="13" fill="#52514e">고치기 전 eaa1fef → 고친 뒤 9ded267 · 한 곳에서 줄 서던 것을 줄 서지 않게</text>
 
 <!-- ROW 1 LEFT: log before -->

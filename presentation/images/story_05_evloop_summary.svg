@@ -5,7 +5,7 @@
 <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a32e2e"/></marker>
 <marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker>
 </defs>
-<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">5. 쉬는 keep-alive 연결과 event loop, 그리고 남은 것</text>
+<text x="32" y="44" font-size="22" font-weight="800" fill="#0b0b0b">5. event loop, 남은 SPOF, 검증</text>
 <text x="32" y="68" font-size="13" fill="#52514e">worker 8 · keep-alive 연결 100개 · ab -n 10000 -c 100 · 3회 중앙값</text>
 
 <!-- TOP LEFT: thread pool with idle keep-alive -->
