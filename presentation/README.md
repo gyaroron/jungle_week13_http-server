@@ -9,7 +9,7 @@
 | 2. 요청 한 건이 지나가는 길 | 전체 구조, 상태 머신 |
 | 3. Proxy 두 가지 | Forward vs Reverse |
 | 4. 연결 처리 방식과 C10K | 부하 테스트, event loop |
-| 5. AI가 쓴 코드를 어떻게 믿었나 | 검증 5단계, 버그 발견과 수정 |
+| 5. 단일 장애 지점(SPOF) | 찾은 SPOF 4개와 수정, 남은 SPOF |
 | 6. 배운 점 · 다음 단계 | — |
 
 ---
@@ -18,7 +18,7 @@
 
 ![요구사항 검수표](images/02_requirements.svg)
 
-- 필수 항목 **16개 모두 통과**했습니다. 단, 기능 테스트는 처음엔 19/21이었습니다. 원인을 찾아 고친 뒤 22/22가 되었고, 이후 느린 client 대응 검사 2건을 더해 현재 **24/24**입니다(5장).
+- 필수 항목 **16개 모두 통과**했습니다. 단, 기능 테스트는 처음엔 19/21이었습니다. 원인을 찾아 고친 뒤 22/22가 되었고, 이후 느린 client 대응 검사 2건을 더해 현재 **24/24**입니다(5장 SPOF).
 - "둘 중 하나 이상"인 조건은 하나만 맞아도 되지만 둘 다 구현했습니다.
   - Proxy: Forward와 Reverse를 **둘 다** 구현했습니다.
   - 동시 처리: 스레드 풀(채택)과 연결별 스레드, 두 가지 **동시성 모델**을 만들고, 동시성이 없는 **순차 처리 기준선**과 브랜치별로 비교했습니다.
@@ -149,42 +149,37 @@ make && ./build/server -p 8080 -r ./www -w 8 -c routes.conf.example -f
 
 ---
 
-## 5. AI가 쓴 코드를 어떻게 믿었나
+## 5. 단일 장애 지점(SPOF; Single Point of Failure)
 
-![검증 5단계](images/06_verification.svg)
+![SPOF](images/06_spof.svg)
 
-| 단계 | 명령 | 결과 (2026-11-26 로컬 재실행) |
+**SPOF란:** 그 한 곳이 멈추거나 막히면 **시스템 전체가 함께 멈추는 지점**입니다. 서버에서는 "모든 요청이 반드시 지나가는데 대신할 길이 없는 곳"이 SPOF가 됩니다. thread를 여러 개 두어도, 모두가 같은 lock이나 같은 대기열 하나를 기다리면 그 lock과 대기열이 SPOF입니다.
+
+### 5-1. 찾아서 고친 SPOF 4개 (`9ded267`)
+
+| SPOF | 고치기 전 (`eaa1fef`) | 무엇이 전체를 멈추나 | 고친 뒤 (현재 코드) |
+|---|---|---|---|
+| ① 느린 client와 worker | `recv()`마다 `SO_RCVTIMEO` 5초가 새로 시작됨 (`src/conn.c:117`) | 헤더를 몇 초마다 1바이트씩 보내면 제한 시간이 계속 늘어나 worker 하나를 무한히 붙잡음. 이런 연결이 worker 수만큼 오면 서버 전체가 응답 불가 | 요청 하나에 **monotonic deadline** 하나 (`src/conn.c:60`, `:153`, `:235`). 남은 시간만큼만 기다리고 넘으면 408 |
+| ② accept 반복과 worker 대기열 | 대기열이 차면 `pool_submit()`이 `not_full`에서 기다림 (`src/pool.c:120`) | accept 반복이 멈춰 새 연결도, 종료 신호(`g_stop`) 확인도 멈춤 | 기다리지 않고 `EAGAIN` (`src/pool.c:123`) → `main`이 **503**을 보내고 닫음 (`src/main.c:188`) |
+| ③ 로그 출력 | 모든 thread가 같은 mutex를 잡은 채 `write(stderr)` (`src/log.c:25`, `:30`) | stderr를 읽는 쪽이 막히면 로그를 쓰려는 모든 thread가 그 mutex에서 멈춤 | 256 KiB ring buffer에 넣고 전용 writer thread가 출력 (`src/log.c:13`, `:39`). 가득 차면 줄을 버리고 개수만 셈 (`:106`) |
+| ④ 캐시 전역 잠금 | 요청 전체를 `pthread_rwlock` 하나로 감쌈 (`src/conn.c:245`, `src/cache.c:242`) | non-GET 하나가 쓰기 잠금을 기다리는 동안, 느린 GET 다운로드 하나가 끝날 때까지 다른 모든 요청이 줄을 섬 | 요청을 감싸는 잠금 제거. non-GET은 writer 표시와 generation만 올리고 (`src/conn.c:298`, `src/cache.c:249`), 그동안 GET은 캐시를 건너뜀 (`src/cache.c:401`). 저장은 generation이 같을 때만 (`:598`) |
+
+**검증 `[실측]`:** 지금의 기능 검사를 고치기 전 코드(`eaa1fef`)에 돌리면 24개 중 2개가 실패합니다.
+- ① "헤더를 조금씩 보내는 연결은 제한 시간 뒤 408" → 응답 없음(6.0초)
+- ④ "느린 GET 다운로드 중에도 POST와 GET 즉시 처리" → 시간 초과(3.0초)
+
+현재 코드에서는 두 검사 모두 통과하고 ASan · TSan 보고는 0건입니다. ②와 ③은 코드를 읽어 찾은 문제이며, 실패를 재현하는 검사는 아직 없습니다.
+
+### 5-2. 아직 남아 있는 SPOF
+
+| SPOF | 왜 SPOF인가 | 지금의 대응 · 한계 |
 |---|---|---|
-| 단위 테스트 | `make test`, `make test-asan` | HTTP 파서 · MIME · 라우팅 · event 모드 conn **4/4 통과** |
-| 기능 테스트 | `./scripts/functional_test.sh` | **24/24 통과** (캐시 도입 직후 19/21) |
-| 메모리 오류 | `make asan` 후 기능 테스트 | AddressSanitizer + UBSan **오류 0** |
-| 데이터 경쟁 | `make tsan` 후 기능 테스트 | ThreadSanitizer **경고 0** |
-| 메모리 누수 | `leaks --atExit` | **0 bytes**. 단, 캐시 추가 전에 기록한 값입니다 |
-| 부하 | 서버 `-w 128` + `ab -k -n 10000 -c 100` | 70,110 req/s(3회 중앙값), **실패 0** |
+| 서버 process 하나 | crash 하나에 모든 연결이 끊김 | 대신 받을 process가 없음. 여러 process나 여러 서버를 앞에서 나누는 구조는 범위 밖 |
+| event loop thread 하나 (`-e`) | loop가 막히면 accept와 모든 대기 연결이 멈춤 | loop는 Blocking 호출을 하지 않음 (`MSG_DONTWAIT`, 오류 응답도 Non-blocking으로 한 번만 시도). 요청 처리는 worker가 맡음 |
+| reverse proxy 자신 | 백엔드는 여러 개여도 앞단 proxy가 하나 | 백엔드 하나가 죽으면 다음 백엔드로 넘어감 (`src/proxy.c:299`, round-robin). proxy 이중화는 범위 밖 |
+| 짧게 잡는 공유 lock | 캐시 목록 mutex, route별 round-robin mutex | 요청 전체가 아니라 목록을 고치는 짧은 구간만 잡음. 잡은 채로 네트워크 I/O를 하지 않음 |
 
-**검증하다 발견한 버그 — 발견 → 원인 → 수정**
-
-| | 내용 |
-|---|---|
-| 발견 | 마지막에 GET 캐시를 넣은 뒤 기능 테스트가 19/21로 떨어졌습니다. keep-alive 검사와 Round-Robin 검사가 실패했습니다. |
-| 원인 | `cache.c`가 MISS·HIT 응답에 **항상** `Connection: close`를 붙였습니다. `conn.c`도 캐시를 거친 요청이면 연결을 강제로 닫았습니다. 그래서 정적 파일 keep-alive가 사실상 꺼져 있었습니다. |
-| 수정 | 길이가 정해진 응답(정적 파일, 캐시 HIT)은 클라이언트 요청대로 `keep-alive`를 유지합니다. 업스트림 EOF까지 중계하는 프록시 MISS만 `close`를 유지합니다. `conn.c`는 캐시가 실제로 보낸 값을 따릅니다. |
-| 테스트 | 같은 URL 두 번은 캐시 HIT가 정상 동작입니다. 그래서 RR 검사는 서로 다른 URL로 바꾸고, "같은 URL 재요청 = HIT" 검사를 새로 추가했습니다. |
-| 결과 | 22/22 통과. worker 128 keep-alive는 15,852(`78b04af`) → 25,912 req/s(`eaa1fef`)가 되었습니다(4장 측정 ③). |
-
-**두 번째 수정 (`9ded267`) — 느린 client 하나가 서버를 세우는 문제**
-
-| | 내용 |
-|---|---|
-| 문제 | 느린 client 하나가 worker를 붙잡고, 막힌 로그 출력이 서버 전체를 멈추고, 캐시 전역 잠금이 읽기·쓰기를 서로 기다리게 할 수 있었습니다. |
-| 수정 | 요청별 monotonic deadline으로 408, queue가 가득 차면 `EAGAIN` → 503, 256 KiB log ring buffer와 전용 writer thread, 요청 전체를 감싸던 캐시 rwlock 제거(non-GET은 writer 표시와 generation으로 처리) |
-| 검사 | `functional_test.sh`에 "헤더를 조금씩 보내는 연결은 제한 시간 뒤 408"과 "느린 GET 다운로드 중에도 POST와 GET 즉시 처리"를 추가했습니다. 두 검사는 이전 코드에서 실패한다고 커밋에 기록했고, 이번 세션에서 이전 코드로 다시 확인하지는 않았습니다. |
-
-> **포인트:** "AI가 짠 코드가 돌아간다"에서 멈추지 않았습니다. 기존 테스트를 계속 다시 돌렸기 때문에 새 기능이 옛 기능을 깨뜨린 것을 바로 잡았고, 새 위험은 새 검사로 먼저 고정했습니다.
-
-**AI와 일한 방식**
-- 단계별 작업 지시서(`docs/mac_tutorial_package/`)로 범위를 정했습니다. 각 단계의 결과는 실제 터미널 출력과 함께 [`docs/TUTORIAL_LOG.md`](../docs/TUTORIAL_LOG.md)에 기록했습니다.
-- 숫자는 실행한 결과만 적었습니다. 재현하지 못한 항목(Linux 빌드, 6-1 경쟁 상태 재현)은 "미실행"으로 남겼습니다.
+> **정리:** SPOF는 "thread를 늘리면 해결"되지 않습니다. 모두가 기다리는 곳(lock, 대기열, 출력, 시간 제한)을 찾아 **기다리지 않게 하거나, 기다림에 끝을 두거나, 실패를 빨리 돌려주는 것(408 · 503)**이 이번 수정의 공통 원칙입니다.
 
 ---
 
