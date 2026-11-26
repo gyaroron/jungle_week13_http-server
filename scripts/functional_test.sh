@@ -80,7 +80,13 @@ backend_b_pid=$!
 python3 -c 'import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("127.0.0.1", int(__import__("sys").argv[1]))); s.listen(); c,_=s.accept(); c.recv(4096); time.sleep(5); c.close(); s.close()' "$SLOW_PORT" > "$BUILD_DIR/slow_backend.log" 2>&1 &
 slow_backend_pid=$!
 
-./build/server -p "$SERVER_PORT" -w 4 -t 2 -c "$ROUTES_FILE" -f \
+# SERVER_MODE=event 이면 kqueue/epoll event loop 모드(-e)로 같은 검사를 돌립니다.
+SERVER_MODE=${SERVER_MODE:-pool}
+mode_args=()
+if [[ "$SERVER_MODE" == event ]]; then mode_args=(-e); fi
+printf '서버 모드: %s\n' "$SERVER_MODE"
+
+./build/server -p "$SERVER_PORT" -w 4 -t 2 -c "$ROUTES_FILE" -f ${mode_args[@]+"${mode_args[@]}"} \
     > "$SERVER_LOG" 2>&1 &
 server_pid=$!
 
@@ -201,6 +207,30 @@ done
 if [[ "$concurrent_failed" -eq 0 ]]; then
     pass '동시 클라이언트 20개'
 else fail '동시 클라이언트 20개'; fi
+
+# worker(4개)보다 많은 keep-alive 연결이 요청 하나씩 끝내고 쉬는 동안에도 새 요청은 바로 처리돼야 합니다.
+# thread pool 모드는 쉬는 연결이 worker를 붙잡아 이 검사가 제한 시간까지 기다리므로 event 모드에서만 실행합니다.
+if [[ "$SERVER_MODE" == event ]]; then
+    python3 - "$SERVER_PORT" <<'PY' > "$BUILD_DIR/idle_keepalive.log" 2>&1 &
+import socket, sys, time
+port = int(sys.argv[1])
+conns = []
+for _ in range(12):
+    s = socket.create_connection(("127.0.0.1", port))
+    s.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    s.recv(65536)
+    conns.append(s)
+print("idle", len(conns), flush=True)
+time.sleep(1.5)
+PY
+    idle_pid=$!
+    sleep 0.5
+    idle_time=$(curl -sS --max-time 3 -o /dev/null -w '%{time_total}' "http://127.0.0.1:$SERVER_PORT/" 2>/dev/null || echo 9)
+    wait "$idle_pid" 2>/dev/null || true
+    if grep -q 'idle 12' "$BUILD_DIR/idle_keepalive.log" && awk -v t="$idle_time" 'BEGIN { exit !(t < 1.0) }'; then
+        pass "쉬는 keep-alive 연결 12개(worker 4개)와 함께 새 요청 즉시 처리 (${idle_time}s)"
+    else fail "쉬는 keep-alive 연결 12개와 함께 새 요청 (time=${idle_time}s)"; fi
+fi
 
 # 느린 수신자가 큰 파일 전송 도중 연결을 닫아도 서버가 살아 있는지 봅니다.
 curl -sS --limit-rate 16k --max-time 0.2 \

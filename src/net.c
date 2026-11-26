@@ -230,3 +230,15 @@ int net_connect(const char *host, const char *port, int timeout_ms) {
     if (connected_fd < 0) errno = saved_error;
     return connected_fd;
 }
+
+int net_prepare_client(int fd, int timeout_sec) {
+    // macOS는 듣는 소켓의 Non-blocking 설정을 물려주므로 연결 소켓을 Blocking으로 되돌립니다.
+    if (net_set_blocking(fd) < 0) return -1;
+    if (net_set_timeouts(fd, timeout_sec) < 0) return -1;
+#ifdef SO_NOSIGPIPE
+    // 끊긴 상대에게 쓰는 동안 SIGPIPE가 생기지 않게 합니다.
+    int no_sigpipe = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe)) < 0) return -1;
+#endif
+    return 0;
+}

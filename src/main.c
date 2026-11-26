@@ -1,5 +1,6 @@
 #include "conn.h"
 #include "config.h"
+#include "evloop.h"
 #include "log.h"
 #include "net.h"
 #include "pool.h"
@@ -117,6 +118,16 @@ int main(int argc, char **argv) {
     // 서버가 연결을 기다리는 주소와 듣는 소켓 번호를 출력합니다.
     server_log("listening on %s:%d (fd %d)\n", cfg.host, cfg.port, listen_fd);
 
+    // -e: listen socket과 대기 연결을 kqueue/epoll event loop 하나가 맡습니다.
+    if (cfg.event_loop) {
+        int loop_result = evloop_run(listen_fd, &cfg, &g_stop);
+        close(listen_fd);
+        server_log("server stopped\n");
+        cleanup_routes(routes, cfg.route_count);
+        server_log_flush(1000);
+        return loop_result < 0 ? 1 : 0;
+    }
+
     // 설정은 일꾼이 모두 끝날 때까지 읽기 전용으로 공유합니다.
     g_worker_config = &cfg;
     struct pool *workers = pool_create(cfg.workers, APP_QUEUE_CAP,
@@ -153,28 +164,12 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        // macOS는 듣는 소켓의 비차단 설정을 물려주므로 연결 소켓을 차단 모드로 되돌립니다.
-        if (net_set_blocking(conn_fd) < 0) {
-            server_log_errno("fcntl connection blocking", errno);
+        // Blocking 전환 · 송수신 제한 시간 · SO_NOSIGPIPE를 event loop 모드와 같은 함수로 맞춥니다.
+        if (net_prepare_client(conn_fd, cfg.timeout_sec) < 0) {
+            server_log_errno("prepare client socket", errno);
             close(conn_fd);
             continue;
         }
-        if (net_set_timeouts(conn_fd, cfg.timeout_sec) < 0) {
-            server_log_errno("setsockopt timeout", errno);
-            close(conn_fd);
-            continue;
-        }
-
-#ifdef SO_NOSIGPIPE
-        // macOS 연결 소켓에 쓰기 중 SIGPIPE를 만들지 않도록 설정합니다.
-        int no_sigpipe = 1;
-        if (setsockopt(conn_fd, SOL_SOCKET, SO_NOSIGPIPE,
-                       &no_sigpipe, sizeof(no_sigpipe)) < 0) {
-            server_log_errno("setsockopt SO_NOSIGPIPE", errno);
-            close(conn_fd);
-            continue;
-        }
-#endif
 
         // 클라이언트 주소 구조체에 담긴 IPv4 주소를 사람이 읽는 문자열로 바꿉니다.
         char ip[INET_ADDRSTRLEN];

@@ -14,5 +14,7 @@ int net_set_timeouts(int fd, int seconds);
 int net_set_nonblock(int fd);
 int net_set_blocking(int fd);
 int net_wait(int fd, short events, int timeout_ms);
+// accept()로 받은 연결 소켓을 Blocking + 송수신 제한 시간 + (macOS) SO_NOSIGPIPE로 맞춥니다.
+int net_prepare_client(int fd, int timeout_sec);
 
 #endif

@@ -11,9 +11,11 @@ BIN := build/server
 TEST_HTTP_BIN := build/test_http
 TEST_MIME_BIN := build/test_mime
 TEST_ROUTE_BIN := build/test_route
+TEST_CONN_EVENT_BIN := build/test_conn_event
 TEST_HTTP_SRC := tests/test_http.c src/http.c
 TEST_MIME_SRC := tests/test_mime.c src/mime.c
 TEST_ROUTE_SRC := tests/test_route.c src/route.c
+TEST_CONN_EVENT_SRC := tests/test_conn_event.c $(filter-out src/main.c,$(SRC))
 
 .PHONY: all asan tsan run clean test test-asan
 
@@ -45,10 +47,14 @@ $(TEST_MIME_BIN): $(TEST_MIME_SRC) include/mime.h | build
 $(TEST_ROUTE_BIN): $(TEST_ROUTE_SRC) include/route.h | build
 	$(CC) $(CFLAGS) $(TEST_ROUTE_SRC) $(LDFLAGS) -o $@
 
-test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN)
+$(TEST_CONN_EVENT_BIN): $(TEST_CONN_EVENT_SRC) include/conn.h | build
+	$(CC) $(CFLAGS) $(TEST_CONN_EVENT_SRC) $(LDFLAGS) -o $@
+
+test: $(TEST_HTTP_BIN) $(TEST_MIME_BIN) $(TEST_ROUTE_BIN) $(TEST_CONN_EVENT_BIN)
 	./$(TEST_HTTP_BIN)
 	./$(TEST_MIME_BIN)
 	./$(TEST_ROUTE_BIN)
+	./$(TEST_CONN_EVENT_BIN) 2>/dev/null
 
 test-asan: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
 test-asan: LDFLAGS += -fsanitize=address,undefined

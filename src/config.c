@@ -9,7 +9,7 @@
 void config_usage(const char *program) {
     fprintf(stderr,
             "Usage: %s [-p port] [-r root] [-b backlog] [-w workers] "
-            "[-t seconds] [-c routes-file] [-f] [-h]\n",
+            "[-t seconds] [-c routes-file] [-f] [-e] [-h]\n",
             program);
 }
 
@@ -46,12 +46,13 @@ int config_parse(int argc, char **argv, struct config *cfg) {
         .workers = 8,
         .timeout_sec = 5,
         .routes_path = NULL,
-        .forward_proxy = 0
+        .forward_proxy = 0,
+        .event_loop = 0
     };
 
     opterr = 0;
     int option;
-    while ((option = getopt(argc, argv, "p:r:b:w:t:c:fh")) != -1) {
+    while ((option = getopt(argc, argv, "p:r:b:w:t:c:feh")) != -1) {
         switch (option) {
             case 'p':
                 if (parse_number(optarg, 1, 65535, &cfg->port) < 0) {
@@ -84,6 +85,7 @@ int config_parse(int argc, char **argv, struct config *cfg) {
                 break;
             case 'c': cfg->routes_path = optarg; break;
             case 'f': cfg->forward_proxy = 1; break;
+            case 'e': cfg->event_loop = 1; break;
             case 'h':
                 config_usage(argv[0]);
                 return 1;

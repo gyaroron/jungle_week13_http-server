@@ -12,6 +12,7 @@ struct config {
     int timeout_sec;
     const char *routes_path;
     int forward_proxy;
+    int event_loop;      // -e: kqueue/epoll event loop로 연결을 감시합니다.
     struct route *routes;
     int route_count;
 };
